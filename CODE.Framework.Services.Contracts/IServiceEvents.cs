@@ -1,13 +1,12 @@
-﻿namespace CODE.Framework.Services.Contracts
+﻿namespace CODE.Framework.Services.Contracts;
+
+/// <summary>
+/// Standard features that can be implemented on a service implementation.
+/// </summary>
+public interface IServiceEvents
 {
     /// <summary>
-    /// Standard features that can be implemented on a service implementation.
+    /// Fires when a service is added to a host
     /// </summary>
-    public interface IServiceEvents
-    {
-        /// <summary>
-        /// Fires when a service is added to a host
-        /// </summary>
-        void OnInProcessHostLaunched();
-    }
+    void OnInProcessHostLaunched();
 }
