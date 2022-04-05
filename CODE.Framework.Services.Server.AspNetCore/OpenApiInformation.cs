@@ -1,4 +1,5 @@
 ﻿using System.Xml;
+using DescriptionAttribute = CODE.Framework.Services.Contracts.DescriptionAttribute;
 
 namespace CODE.Framework.Services.Server.AspNetCore;
 
