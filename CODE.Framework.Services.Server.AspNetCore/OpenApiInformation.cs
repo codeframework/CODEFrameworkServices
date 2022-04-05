@@ -868,11 +868,16 @@ namespace CODE.Framework.Services.Server.AspNetCore
         public string Name { get; set; }
         public string Description { get; set; }
         public Type Type { get; set; }
-        public bool Required { get; set; } = true;
+        public bool Required { get; set; } = false;
     }
 
     public class OpenApiPositionalOperationParameter : OpenApiNamedOperationParameter
     {
+        public OpenApiPositionalOperationParameter()
+        {
+            Required = true;
+        }
+
         public int PositionIndex { get; set; }
     }
 
