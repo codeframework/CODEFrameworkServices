@@ -1,14 +1,12 @@
 ﻿using System;
-using System.Reflection;
 using CODE.Framework.Fundamentals.Configuration;
-using CODE.Framework.Fundamentals.Utilities;
 using CODE.Framework.Services.Client;
 using Sample.Contracts;
 
-var originalColor = Console.ForegroundColor;
-
 ConfigurationSettings.Sources["Memory"].Settings["RestServiceUrl:ICustomerService"] = "http://localhost:5008/api/customers";
 ConfigurationSettings.Sources["Memory"].Settings["RestServiceUrl:IUserService"] = "http://localhost:5008/api/users";
+
+var originalColor = Console.ForegroundColor;
 
 Console.WriteLine("CODE Framework Service Example Test Client.\r");
 Console.WriteLine("Press key to call ICustomerService.GetCustomers().\r");
@@ -19,6 +17,7 @@ ServiceClient.Call<ICustomerService>(c =>
     try
     {
         Console.WriteLine("Calling service....");
+
         var response = c.GetCustomers(new GetCustomersRequest());
         if (response.Success)
         {

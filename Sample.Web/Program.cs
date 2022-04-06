@@ -1,6 +1,7 @@
 ﻿var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddServiceHandler(config =>
+// Enables hosting of CODE Framework services (either from the config file, or programmatically as shown here).
+builder.Services.AddHostedServices(config =>
 {
     config.Services.Clear();
 

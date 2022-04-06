@@ -1,8 +1,4 @@
 ﻿using CODE.Framework.Services.Server.AspNetCore.Properties;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using System.Security.Claims;
 using System.Security.Principal;
 using System.Threading.Tasks;
@@ -17,7 +13,16 @@ public static class ServiceHandlerExtensions
     /// <param name="services"></param>
     /// <param name="optionsAction"></param>
     /// <returns></returns>
-    public static IServiceCollection AddServiceHandler(this IServiceCollection services, Action<ServiceHandlerConfiguration> optionsAction)
+    [Obsolete("Use AddHostedServices() instead.")]
+    public static IServiceCollection AddServiceHandler(this IServiceCollection services, Action<ServiceHandlerConfiguration> optionsAction) => AddHostedServices(services, optionsAction);
+
+    /// <summary>
+    /// Configures the system to enable service hosting (and all required features) and then sets up the hosted service objects
+    /// </summary>
+    /// <param name="services"></param>
+    /// <param name="optionsAction"></param>
+    /// <returns></returns>
+    public static IServiceCollection AddHostedServices(this IServiceCollection services, Action<ServiceHandlerConfiguration> optionsAction)
     {
         // add strongly typed configuration
         services.AddOptions();

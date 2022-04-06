@@ -50,7 +50,7 @@ public interface ICustomerService
     /// </summary>
     /// <param name="request"></param>
     /// <returns></returns>
-    [OperationContract, Rest(Method = RestMethods.Post, Name = "Status")]
+    [OperationContract, Rest(Method = RestMethods.Get, Name = "Status")]
     GetStatusResponse GetStatus(GetStatusRequest request);
 
     [OperationContract, Rest(Method = RestMethods.Put, Name = "Upload")]
@@ -70,7 +70,7 @@ public class UploadCustomerFileRequest : FileRequest
 [DataContract]
 public class GetStatusResponse : BaseServiceResponse
 {
-    [DataMember()]
+    [DataMember]
     public CustomerStatus Status { get; set; } = CustomerStatus.Normal;
 }
 
@@ -78,7 +78,7 @@ public class GetStatusResponse : BaseServiceResponse
 [DataContract]
 public class GetStatusRequest
 {
-    [DataMember()]
+    [DataMember, RestUrlParameter(Mode = UrlParameterMode.Inline)]
     public CustomerStatus Status { get; set; } = CustomerStatus.Normal;
 }
 
@@ -148,6 +148,9 @@ public class SearchTestResponse : BaseServiceResponse
 
     [DataMember]
     public bool InactivesAreIncluded { get; set; } = false;
+
+    [DataMember]
+    public List<Customer> Customers { get; set; } = new List<Customer>();
 }
 
 [DataContract]

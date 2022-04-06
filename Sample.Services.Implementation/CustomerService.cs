@@ -50,19 +50,22 @@ public class CustomerService : ICustomerService, IServiceEvents
 
     public SearchTestResponse SearchTest(SearchTestRequest request)
     {
-        try
+        var response = new SearchTestResponse
         {
-            return new SearchTestResponse
+            SearchStringUsed = request.SearchString,
+            InactivesAreIncluded = request.IncludeInactive,
+            Success = true
+        };
+
+        for (var x = 1; x <= 10; x++)
+            response.Customers.Add(new Customer
             {
-                SearchStringUsed = request.SearchString,
-                InactivesAreIncluded = request.IncludeInactive,
-                Success = true
-            };
-        }
-        catch (Exception ex)
-        {
-            return ServiceHelper.GetPopulatedFailureResponse<SearchTestResponse>(ex);
-        }
+                Name = $"{request.SearchString} {x}",
+                Company = "EPS/CODE",
+                Id = x.ToString()
+            });
+
+        return response;
     }
 
     public GetCustomerResponse GetCustomer(GetCustomerRequest request)

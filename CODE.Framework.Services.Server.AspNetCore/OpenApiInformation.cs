@@ -493,11 +493,22 @@ public class PathJsonConverter : JsonConverter<Dictionary<string, OpenApiPathInf
                 writer.WriteStringValue(parameterOpenApiTypeFormat);
             }
         }
-        if (!string.IsNullOrEmpty(parameter.Description))
+
+        var parameterDescription = parameter.Description;
+        if (parameter.Type.IsEnum)
+        {
+            var enumDescription = OpenApiHelper.GetOpenApiEnumDescription(parameter.Type);
+            if (string.IsNullOrEmpty(parameterDescription))
+                parameterDescription = enumDescription;
+            else
+                parameterDescription += $" Enum values: {enumDescription}";
+        }
+        if (!string.IsNullOrEmpty(parameterDescription))
         {
             writer.WritePropertyName("description");
-            writer.WriteStringValue(parameter.Description.Trim());
+            writer.WriteStringValue(parameterDescription);
         }
+
         writer.WriteEndObject();
     }
 }
