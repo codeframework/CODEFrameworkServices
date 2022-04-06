@@ -113,6 +113,12 @@ public static class ServiceHandlerExtensions
     }
 
     /// <summary>
+    /// Enabled extended error display in exception return messages
+    /// </summary>
+    /// <param name="appBuilder"></param>
+    public static void ShowExtendedFailureInformation(this IApplicationBuilder appBuilder) => ServiceHelper.ShowExtendedFailureInformation = true;
+
+    /// <summary>
     /// Enabled CODE Framework service hosting
     /// </summary>
     /// <param name="appBuilder"></param>

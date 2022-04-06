@@ -12,7 +12,7 @@ public class BaseServiceResponse
     /// </summary>
     /// <value>The success.</value>
     [DataMember(IsRequired = true)]
-    public bool Success { get; set; } = false;
+    public bool Success { get; set; } = true;
 
     [DataMember]
     public string FailureInformation { get; set; } = string.Empty;

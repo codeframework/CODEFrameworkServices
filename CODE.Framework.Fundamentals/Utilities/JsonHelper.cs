@@ -106,7 +106,7 @@ namespace CODE.Framework.Fundamentals.Utilities
                         sb.Append(',');
                         if (!inQuotes)
                         {
-                            sb.Append("\r\n");
+                            sb.AppendLine();
                             sb.Append(StringHelper.Replicate(" ", currentIndentLevel*indentSpaces));
                         }
                         break;
@@ -131,12 +131,12 @@ namespace CODE.Framework.Fundamentals.Utilities
                         sb.Append('\'');
                         break;
                     case (byte) '{':
-                        sb.Append("{\r\n");
+                        sb.Append("{" + Environment.NewLine);
                         currentIndentLevel++;
                         sb.Append(StringHelper.Replicate(" ", currentIndentLevel*indentSpaces));
                         break;
                     case (byte) '}':
-                        sb.Append("\r\n");
+                        sb.Append(Environment.NewLine);
                         currentIndentLevel--;
                         sb.Append(StringHelper.Replicate(" ", currentIndentLevel*indentSpaces));
                         sb.Append('}');

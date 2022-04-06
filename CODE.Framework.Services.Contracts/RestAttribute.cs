@@ -175,3 +175,6 @@ public enum RestMethods
     /// <summary>HTTP POST or PUT (both are valid for this setting)</summary>
     PostOrPut
 }
+
+[AttributeUsage(AttributeTargets.Method | AttributeTargets.Class | AttributeTargets.Interface)]
+public class StandardExceptionHandlingAttribute : Attribute { }

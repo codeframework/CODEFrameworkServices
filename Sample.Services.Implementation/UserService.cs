@@ -13,30 +13,22 @@ public class UserService : IUserService
 
     public AuthenticateUserResponse AuthenticateUser(AuthenticateUserRequest request)
     {
-        try
+        var response = new AuthenticateUserResponse();
+
+        if (string.IsNullOrEmpty(request.UserName) || string.IsNullOrEmpty(request.Password))
         {
-            var response = new AuthenticateUserResponse();
-
-            if (string.IsNullOrEmpty(request.UserName) || string.IsNullOrEmpty(request.Password))
-            {
-                response.Success = false;
-                response.FailureInformation = "Invalid username or password.";
-                return response;
-            }
-
-            response.Id = Guid.NewGuid();
-            response.Email = _userProvider.GetEmail();
-            response.Firstname = _userProvider.GetFirstname();
-            response.Lastname = _userProvider.GetLastname();
-
-            // pass-through success and set Auth cookie in controller override
-            response.Success = true;
+            response.Success = false;
+            response.FailureInformation = "Invalid username or password.";
             return response;
         }
-        catch (Exception ex)
-        {
-            return ServiceHelper.GetPopulatedFailureResponse<AuthenticateUserResponse>(ex);
-        }
+
+        response.Id = Guid.NewGuid();
+        response.Email = _userProvider.GetEmail();
+        response.Firstname = _userProvider.GetFirstname();
+        response.Lastname = _userProvider.GetLastname();
+
+        // pass-through success and set Auth cookie in controller override
+        return response;
     }
 
     public SignoutResponse Signout(SignoutRequest response) => new SignoutResponse { Success = true };
@@ -62,17 +54,16 @@ public class UserService : IUserService
         new GetUserResponse
         {
             UserId = request.Id,
-            Success = true,
             Firstname = "Test",
             Lastname = "User",
             Email = "test@user.com"
         };
 
-    public SaveUserResponse SaveUser(SaveUserRequest userInfo) => new SaveUserResponse {Success = true, Id = Guid.NewGuid()};
+    public SaveUserResponse SaveUser(SaveUserRequest userInfo) => new SaveUserResponse { Success = true, Id = Guid.NewGuid() };
 
     public ResetPasswordResponse ResetPassword(ResetPasswordRequest request)
     {
-        var response = new ResetPasswordResponse {Success = true};
+        var response = new ResetPasswordResponse { Success = true };
         return response;
 
         //            var user = UserRepository.GetUserByUsername(request.Username);
@@ -127,8 +118,7 @@ public class UserService : IUserService
             new User {Id = Guid.NewGuid(), Username = "myeager"},
             new User {Id = Guid.NewGuid(), Username = "ewhitney"},
             new User {Id = Guid.NewGuid(), Username = "odobretsberger"}
-        },
-        Success = true
+        }
     };
 }
 

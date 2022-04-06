@@ -118,18 +118,21 @@ namespace CODE.Framework.Fundamentals.Utilities
             }
             sb.Append(@"</font></td></tr></table>");
             // Script needed to expand and collapse
-            sb.Append("\r\n<script language=\"JavaScript\">\r\n");
-            sb.Append("function ShowError(id,idTable)\r\n{\r\n");
-            sb.Append("   obj = document.getElementById(idTable);\r\n");
-            sb.Append("   obj2 = document.getElementById(id);\r\n");
-            sb.Append("   if (obj.style.display == \"none\")\r\n   {\r\n");
-            sb.Append("       obj2.innerHTML = \"-\";\r\n");
-            sb.Append("       obj.style.display = \"\";\r\n   }\r\n");
-            sb.Append("   else\r\n   {\r\n");
-            sb.Append("       obj2.innerHTML = \"+\";\r\n");
-            sb.Append("       obj.style.display = \"none\";\r\n   }\r\n");
-            sb.Append("}\r\n");
-            sb.Append("</script>\r\n");
+            sb.AppendLine();
+            sb.AppendLine("<script language=\"JavaScript\">");
+            sb.AppendLine("function ShowError(id,idTable) {");
+            sb.AppendLine("   obj = document.getElementById(idTable);");
+            sb.AppendLine("   obj2 = document.getElementById(id);");
+            sb.AppendLine("   if (obj.style.display == \"none\") {");
+            sb.AppendLine("       obj2.innerHTML = \"-\";");
+            sb.AppendLine("       obj.style.display = \"\";");
+            sb.AppendLine("   }");
+            sb.AppendLine("   else {");
+            sb.AppendLine("       obj2.innerHTML = \"+\";");
+            sb.AppendLine("       obj.style.display = \"none\";");
+            sb.AppendLine("   }");
+            sb.AppendLine("}");
+            sb.AppendLine("</script>");
             return sb.ToString();
         }
 
@@ -141,34 +144,35 @@ namespace CODE.Framework.Fundamentals.Utilities
         public static string GetExceptionText(Exception exception)
         {
             var sb = new StringBuilder();
-            sb.Append(Resources.ExceptionStack + "\r\n\r\n");
+            sb.AppendLine(Resources.ExceptionStack);
+            sb.AppendLine();
             var errorCount = -1;
             while (exception != null)
             {
                 errorCount++;
-                if (errorCount > 0) sb.Append("\r\n");
+                if (errorCount > 0) sb.AppendLine();
                 sb.Append(exception.Message);
 
                 // Error detail
                 // Exception attributes
-                sb.Append("  " + Resources.ExceptionAttributes + "\r\n");
+                sb.AppendLine($"  {Resources.ExceptionAttributes}");
                 // Message
-                sb.Append("    " + Resources.Message + " " + StringHelper.ToStringSafe(exception.Message) + "\r\n");
+                sb.AppendLine($"    {Resources.Message} {StringHelper.ToStringSafe(exception.Message)}");
                 // Exception type
-                sb.Append("    " + Resources.ExceptionType + " " + StringHelper.ToStringSafe(exception.GetType()) + "\r\n");
+                sb.AppendLine($"    {Resources.ExceptionType} {StringHelper.ToStringSafe(exception.GetType())}");
                 // Source
-                sb.Append("    " + Resources.Source + " " + StringHelper.ToStringSafe(exception.Source) + "\r\n");
+                sb.AppendLine($"    {Resources.Source} {StringHelper.ToStringSafe(exception.Source)}");
                 if (exception.TargetSite != null)
                 {
                     // Thrown by code in method
-                    sb.Append("    " + Resources.ThrownByMethod + " " + StringHelper.ToStringSafe(exception.TargetSite.Name) + "\r\n");
+                    sb.AppendLine($"    {Resources.ThrownByMethod} {StringHelper.ToStringSafe(exception.TargetSite.Name)}");
                     if (exception.TargetSite.DeclaringType != null)
                         // Thrown by code in method
-                        sb.Append("    " + Resources.ThrownByClass + " " + StringHelper.ToStringSafe(exception.TargetSite.DeclaringType.Name) + "\r\n");
+                        sb.AppendLine($"    {Resources.ThrownByClass} {StringHelper.ToStringSafe(exception.TargetSite.DeclaringType.Name)}");
                 }
 
                 // Stack Trace
-                sb.Append("  " + Resources.StackTrace + "\r\n");
+                sb.AppendLine($"  {Resources.StackTrace}");
                 // Actual stack trace
                 if (!string.IsNullOrEmpty(exception.StackTrace))
                 {
@@ -187,16 +191,14 @@ namespace CODE.Framework.Fundamentals.Utilities
                                 at = file.IndexOf(":line", StringComparison.Ordinal);
                                 var lineNumber = file.Substring(at + 6);
                                 file = file.Substring(0, at);
-                                sb.Append("    " + Resources.LineNumber + ": " + lineNumber + " -- ");
-                                sb.Append(Resources.Method + ": " + detail + " -- ");
-                                sb.Append(Resources.SourceFile + ": " + file + "\r\n");
+                                sb.AppendLine($"    {Resources.LineNumber}: {lineNumber} -- {Resources.Method}: {detail} -- {Resources.SourceFile}: {file}");
                             }
                             else
                             {
                                 // We only have generic info
                                 var detail = stackLine.Trim().Trim();
                                 detail = detail.Replace("at ", string.Empty);
-                                sb.Append("    " + Resources.Method + ": " + detail);
+                                sb.Append($"    {Resources.Method}: {detail}");
                             }
                 }
 

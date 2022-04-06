@@ -7,45 +7,29 @@ public class CustomerService : ICustomerService, IServiceEvents
 {
     public PingResponse Ping(PingRequest request) => this.GetPopulatedPingResponse();
 
-    public DateTestResponse DateTest(DateTestRequest request)
+    public DateTestResponse DateTest(DateTestRequest request) => new DateTestResponse
     {
-        try
-        {
-            return new DateTestResponse
-            {
-                Success = true,
-                FirstDateReturned = request.FirstDate,
-                SecondDateReturned = request.SecondDate
-            };
-        }
-        catch (Exception ex)
-        {
-            return ServiceHelper.GetPopulatedFailureResponse<DateTestResponse>(ex);
-        }
-    }
+        FirstDateReturned = request.FirstDate,
+        SecondDateReturned = request.SecondDate
+    };
 
     public GetCustomersResponse GetCustomers(GetCustomersRequest request)
     {
-        try
+        var response = new GetCustomersResponse();
+
+        // Real code goes here...
+
+        response.CustomerList = new List<Customer> 
         {
-            var response = new GetCustomersResponse();
+            new Customer { Name = "Markus Egger", Company = "CODE" },
+            new Customer { Name = "Ellen Whitney", Company = "CODE" },
+            new Customer { Name = "Mike Yeager", Company = "CODE" },
+            new Customer { Name = "Otto Dobretsberger", Company = "CODE" }
+        };
 
-            // Real code goes here...
+        // var x = response.CustomerList[20];   // Put this line in to simulare an exception and trigger automatic exception handline
 
-            response.CustomerList = new Customer[] {
-                new Customer { Name = "Markus Egger", Company = "CODE" },
-                new Customer { Name = "Ellen Whitney", Company = "CODE" },
-                new Customer { Name = "Mike Yeager", Company = "CODE" },
-                new Customer { Name = "Otto Dobretsberger", Company = "CODE" }
-            };
-
-            response.Success = true;
-            return response;
-        }
-        catch (Exception ex)
-        {
-            return ServiceHelper.GetPopulatedFailureResponse<GetCustomersResponse>(ex);
-        }
+        return response;
     }
 
     public SearchTestResponse SearchTest(SearchTestRequest request)
@@ -53,8 +37,7 @@ public class CustomerService : ICustomerService, IServiceEvents
         var response = new SearchTestResponse
         {
             SearchStringUsed = request.SearchString,
-            InactivesAreIncluded = request.IncludeInactive,
-            Success = true
+            InactivesAreIncluded = request.IncludeInactive
         };
 
         for (var x = 1; x <= 10; x++)
@@ -68,50 +51,29 @@ public class CustomerService : ICustomerService, IServiceEvents
         return response;
     }
 
-    public GetCustomerResponse GetCustomer(GetCustomerRequest request)
+    public GetCustomerResponse GetCustomer(GetCustomerRequest request) => new GetCustomerResponse
     {
-        try
-        {
-            // This is possible, but we would have to reference the AspNetCore package
-            // var user = this.GetCurrentPrincipal();
-            // var isValid = user.IsInRole("Administrators");
-
-            var result = new GetCustomerResponse
-            {
-                Customer = new Customer {Id = request.Id, Name = "Markus Egger", Company = "CODE"},
-                Success = true
-            };
-            return result;
+        Customer = new Customer 
+        { 
+            Id = request.Id, 
+            Name = "Markus Egger", 
+            Company = "CODE" 
         }
-        catch (Exception ex)
-        {
-            return ServiceHelper.GetPopulatedFailureResponse<GetCustomerResponse>(ex);
-        }
+    };
 
-    }
-
-    public FileResponse GetPhoto(GetPhotoRequest request)
+    public FileResponse GetPhoto(GetPhotoRequest request) => new FileResponse
     {
-        try
-        {
-            return new FileResponse
-            {
-                ContentType = "image/png",
-                FileName = "ExampleImage.png",
-                FileBytes = Resources.RocketMan
-            };
-        }
-        catch (Exception ex)
-        {
-            return ServiceHelper.GetPopulatedFailureResponse<FileResponse>(ex);
-        }
-    }
+        ContentType = "image/png",
+        FileName = "ExampleImage.png",
+        FileBytes = Resources.RocketMan
+    };
 
     public void OnInProcessHostLaunched()
     {
+        // Could add some special code here for in-process hosting specific things that need to happen
     }
 
-    public GetStatusResponse GetStatus(GetStatusRequest request) => new GetStatusResponse { Status = request.Status, Success = true };
+    public GetStatusResponse GetStatus(GetStatusRequest request) => new GetStatusResponse { Status = request.Status };
 
     public FileResponse UploadCustomerFile(UploadCustomerFileRequest request) => new FileResponse { ContentType = request.ContentType, FileBytes = request.FileBytes, FileName = request.FileName };
 }

@@ -157,7 +157,9 @@ public static class ServiceGardenLocal
 
         if (serviceInstance == null) return false;
 
-        Hosts.Add(contractType, serviceInstance);
+        var proxy = TransparentProxyGenerator.GetProxy(contractType, new InProcessProxyHandler(serviceInstance));
+
+        Hosts.Add(contractType, proxy);
 
         var settingName = $"ServiceProtocol:{contractType.Name}";
         if (!ConfigurationSettings.Settings.IsSettingSupported(settingName))
@@ -227,4 +229,47 @@ public static class ServiceGardenLocal
     /// <param name="contractType">Contract Type</param>
     /// <returns></returns>
     public static object GetService(Type contractType) => Hosts.ContainsKey(contractType) ? Hosts[contractType] : null;
+}
+
+public class InProcessProxyHandler : IProxyHandler
+{
+    private readonly object _instance;
+    private readonly Type _type;
+
+    public InProcessProxyHandler(object instance)
+    {
+        _instance = instance;
+        _type = instance.GetType();
+    }
+
+    public object OnMethod(MethodInfo method, object[] args)
+    {
+        var realMethod = _type.GetMethod(method.Name);
+        if (realMethod != null)
+        {
+            try
+            {
+                return realMethod.Invoke(_instance, args);
+            }
+            catch (Exception ex)
+            {
+                // If there was an exception, we may handle it automatically, IF either the operation or the entire type is flagged to auto-handle exceptions
+                var handlerAttribute = realMethod.GetCustomAttributeEx<StandardExceptionHandlingAttribute>();
+                if (handlerAttribute is null)
+                    handlerAttribute = realMethod.DeclaringType.GetCustomAttributeEx<StandardExceptionHandlingAttribute>();
+
+                if (handlerAttribute is not null)
+                {
+                    var ex2 = ex;
+                    if (ex2 is InvalidOperationException && ex2.InnerException != null)
+                        ex2 = ex2.InnerException;
+                    return ServiceHelper.GetPopulatedFailureResponse(realMethod.ReturnType, ex, realMethod.DeclaringType.Name, realMethod.Name);
+                }
+                else
+                    return null; // TODO: Throw an exception
+            }
+        }
+        else
+            return null; // TODO: Throw an exception
+    }
 }

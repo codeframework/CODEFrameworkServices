@@ -4,6 +4,7 @@
 /// Service operations related to customers
 /// </summary>
 [ServiceContract]
+[StandardExceptionHandling]
 public interface ICustomerService
 {
     /// <summary>
@@ -170,8 +171,7 @@ public class GetCustomerRequest : BaseServiceRequest
 public class GetCustomersResponse : BaseServiceResponse
 {
     [DataMember]
-    //public List<Customer> CustomerList { get; set; } = new List<Customer>();
-    public Customer[] CustomerList { get; set; }
+    public List<Customer> CustomerList { get; set; } = new List<Customer>();
 }
 
 [DataContract]

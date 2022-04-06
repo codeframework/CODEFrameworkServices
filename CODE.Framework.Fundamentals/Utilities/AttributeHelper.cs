@@ -1,4 +1,6 @@
-﻿namespace CODE.Framework.Services.Server.AspNetCore;
+﻿using System.Reflection;
+
+namespace CODE.Framework.Fundamentals.Utilities;
 
 public static class AttributeHelper
 {

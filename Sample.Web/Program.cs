@@ -59,6 +59,9 @@ builder.Services.AddScoped<IUserProvider, FakeUserProvider>();
 // Ready to let ASP.NET build the app
 var app = builder.Build();
 
+// Showing some extra info in dev-mode
+if (builder.Environment.IsDevelopment()) app.ShowExtendedFailureInformation();
+
 // Enabled the CODE Framework service hosting environment
 app.UseServiceHandler(); 
 

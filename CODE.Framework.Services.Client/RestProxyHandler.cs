@@ -122,7 +122,7 @@ public class RestProxyHandler : IProxyHandler
         }
         catch (Exception ex)
         {
-            if (ServiceClient.LogCommunicationErrors) LoggingMediator.Log($"Unable to communicate with service at endpoint '" + serviceUriAbsoluteUri + "' [" + httpMethod + "].\r\n\r\n", ex);
+            if (ServiceClient.LogCommunicationErrors) LoggingMediator.Log($"Unable to communicate with service at endpoint '{serviceUriAbsoluteUri}' [{httpMethod}].{Environment.NewLine}{Environment.NewLine}", ex);
             throw new CommunicationException("Unable to communicate with REST service.", ex);
         }
     }

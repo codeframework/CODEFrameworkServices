@@ -35,9 +35,26 @@ public static class ServiceHelper
     public static TResponse GetPopulatedFailureResponse<TResponse>(Exception ex) where TResponse: new()
     {
         var response = new TResponse();
+        return GetPopulatedFailureResponse(ex, response, 2);
+    }
 
-        var frame = new StackFrame(1);
-        var message = ShowExtendedFailureInformation ? GetExceptionText(ex) : $"Generic error in {frame.GetMethod().DeclaringType.Name}::{frame.GetMethod().Name}";
+    public static object GetPopulatedFailureResponse(Type responseType, Exception ex, string typeName = "", string methodName = "")
+    {
+        var response = Activator.CreateInstance(responseType);
+        return GetPopulatedFailureResponse(ex, response, 2, typeName, methodName);
+    }
+
+    private static TResponse GetPopulatedFailureResponse<TResponse>(Exception ex, TResponse response, int stackDepth, string typeName = "", string methodName = "") where TResponse : new()
+    {
+        if (string.IsNullOrEmpty(typeName) || string.IsNullOrEmpty(methodName))
+        {
+            var frame = new StackFrame(stackDepth);
+            if (string.IsNullOrEmpty(typeName))
+                typeName = frame.GetMethod().DeclaringType.Name;
+            if (string.IsNullOrEmpty(methodName))
+                methodName = frame.GetMethod().Name;
+        }
+        var message = ShowExtendedFailureInformation ? GetExceptionText(ex) : $"Generic error in {typeName}::{methodName}";
 
         if (response is BaseServiceResponse baseResponse)
         {
@@ -62,7 +79,7 @@ public static class ServiceHelper
                     if (parameters.Length == 3 && parameters[0].ParameterType == typeof(string) && parameters[1].ParameterType == typeof(Exception) && parameters[2].ParameterType.Name == "LogEventType")
                     {
                         var callParameters = new object[3];
-                        callParameters[0] = $"Generic error in {frame.GetMethod().DeclaringType.Name}::{frame.GetMethod().Name} - {ex.GetType().Name}";
+                        callParameters[0] = $"Generic error in {typeName}::{methodName} - {ex.GetType().Name}";
                         callParameters[1] = ex;
                         callParameters[2] = 4; // Exception
                         logMethod.Invoke(null, callParameters);
@@ -74,7 +91,7 @@ public static class ServiceHelper
         return response;
     }
 
-    private static string GetExceptionText(Exception exception)
+    public static string GetExceptionText(Exception exception)
     {
         var sb = new StringBuilder();
         sb.AppendLine("Exception Stack:");
@@ -117,7 +134,7 @@ public static class ServiceHelper
                             file = file.Substring(0, at);
                             sb.Append($"    Line Number: {lineNumber} -- ");
                             sb.Append($"Method: {detail} -- ");
-                            sb.Append($"Source File: {file}\r\n");
+                            sb.Append($"Source File: {file}{Environment.NewLine}");
                         }
                         else
                         {

@@ -1,6 +1,5 @@
 ﻿using CODE.Framework.Services.Server.AspNetCore.Properties;
 using Microsoft.AspNetCore.Http.Extensions;
-using Microsoft.AspNetCore.Routing;
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Claims;
@@ -85,58 +84,81 @@ public class ServiceHandler
                 HttpMethod = HttpRequest.Method.ToUpper()
             }
         };
+        context.HttpResponse.Headers.Add("x-powered-by", "CODE Framework - codeframework.io");
+
+        if (context.ServiceInstanceConfiguration.HttpsMode == ControllerHttpsMode.RequireHttps && HttpRequest.Scheme != "https")
+            throw new UnauthorizedAccessException(Resources.ServiceMustBeAccessedOverHttps);
+
+        if (ServiceInstanceConfiguration.OnAuthorize != null)
+            if (!await ServiceInstanceConfiguration.OnAuthorize(context))
+                throw new UnauthorizedAccessException("Not authorized to access this request");
+
+        if (ServiceInstanceConfiguration.OnBeforeMethodInvoke != null)
+            await ServiceInstanceConfiguration.OnBeforeMethodInvoke(context);
 
         try
         {
-            if (context.ServiceInstanceConfiguration.HttpsMode == ControllerHttpsMode.RequireHttps && HttpRequest.Scheme != "https")
-                throw new UnauthorizedAccessException(Resources.ServiceMustBeAccessedOverHttps);
-
-            if (ServiceInstanceConfiguration.OnAuthorize != null)
-                if (!await ServiceInstanceConfiguration.OnAuthorize(context))
-                    throw new UnauthorizedAccessException("Not authorized to access this request");
-
-            if (ServiceInstanceConfiguration.OnBeforeMethodInvoke != null)
-                await ServiceInstanceConfiguration.OnBeforeMethodInvoke(context);
-
             await ExecuteMethod(context);
-
-            ServiceInstanceConfiguration.OnAfterMethodInvoke?.Invoke(context);
-
-            if (context.ResultValue is IFileResponse fileResponse)
-            {
-                // This is a special case in which we stream the file back low level (side-stepping any kind of JSON serialization)
-                context.HttpResponse.ContentType = fileResponse.ContentType;
-                context.HttpResponse.Headers.Add("Content-Disposition" , $"inline; filename=\"{fileResponse.FileName.Trim()}\"");
-                context.HttpResponse.Headers.Add("x-powered-by", "CODE Framework - codeframework.io");
-                await context.HttpResponse.Body.WriteAsync(fileResponse.FileBytes, 0, fileResponse.FileBytes.Length);
-            }
-            else
-            {
-                if (string.IsNullOrEmpty(context.ResultJson))
-                {
-                    var options = new JsonSerializerOptions();
-
-                    if (context.ServiceInstanceConfiguration.JsonFormatMode == JsonFormatModes.CamelCase)
-                        options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-
-#if DEBUG
-                    options.WriteIndented = true;
-#endif
-
-                    var inputType = context.ResultValue.GetType();
-                    context.ResultJson = JsonSerializer.Serialize(context.ResultValue, inputType, options);
-
-                    context.HttpResponse.Headers.Add("x-powered-by", "CODE Framework - codeframework.io");
-                }
-
-                await SendJsonResponseAsync(context, context.ResultValue);
-            }
         }
         catch (Exception ex)
         {
-            var error = new ErrorResponse(ex);
-            await SendJsonResponseAsync(context, error);
+            // If there was an exception, we may handle it automatically, IF either the operation or the entire type is flagged to auto-handle exceptions
+            var handlerAttribute = context.MethodContext.MethodInfo.GetCustomAttributeEx<StandardExceptionHandlingAttribute>();
+            if (handlerAttribute is null)
+                handlerAttribute = context.MethodContext.MethodInfo.DeclaringType.GetCustomAttributeEx<StandardExceptionHandlingAttribute>();
+
+            if (handlerAttribute is not null)
+            {
+                var ex2 = ex;
+                if (ex2 is InvalidOperationException && ex2.InnerException != null)
+                    ex2 = ex2.InnerException;
+                context.ResultValue = ServiceHelper.GetPopulatedFailureResponse(context.MethodContext.MethodInfo.ReturnType, ex, context.MethodContext.MethodInfo.DeclaringType.Name, context.MethodContext.MethodInfo.Name);
+            }
+            else
+            {
+                context.HttpResponse.StatusCode = 500;
+
+                var message = ServiceHelper.ShowExtendedFailureInformation ? ServiceHelper.GetExceptionText(ex).Replace(Environment.NewLine, "  ") : $"Generic error in {context.MethodContext.MethodInfo.DeclaringType.Name}::{context.MethodContext.MethodInfo.Name}";
+                context.HttpResponse.Headers.Add("x-exception", message);
+
+                return;
+            }
         }
+
+        ServiceInstanceConfiguration.OnAfterMethodInvoke?.Invoke(context);
+
+        if (context.ResultValue is IFileResponse fileResponse)
+        {
+            // This is a special case in which we stream the file back low level (side-stepping any kind of JSON serialization)
+            context.HttpResponse.ContentType = fileResponse.ContentType;
+            context.HttpResponse.Headers.Add("Content-Disposition" , $"inline; filename=\"{fileResponse.FileName.Trim()}\"");
+            await context.HttpResponse.Body.WriteAsync(fileResponse.FileBytes, 0, fileResponse.FileBytes.Length);
+        }
+        else
+        {
+            if (string.IsNullOrEmpty(context.ResultJson))
+            {
+                var options = new JsonSerializerOptions();
+
+                if (context.ServiceInstanceConfiguration.JsonFormatMode == JsonFormatModes.CamelCase)
+                    options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+
+#if DEBUG
+                options.WriteIndented = true;
+#endif
+
+                var inputType = context.ResultValue.GetType();
+                context.ResultJson = JsonSerializer.Serialize(context.ResultValue, inputType, options);
+            }
+
+            await SendJsonResponseAsync(context, context.ResultValue);
+        }
+
+        //catch (Exception ex)
+        //{
+        //    var error = new ErrorResponse(ex);
+        //    await SendJsonResponseAsync(context, error);
+        //}
     }
 
     /// <summary>

@@ -4,6 +4,7 @@
 [Summary("Services/API related to user management")]
 [Description("This service includes all kinds of operations related to user management, such as login/logout, user CRUD operations, and so on.")]
 [ExternalDocumentation("For more information, please refer to the external documentation.", "https://docs.codeframework.io")]
+[StandardExceptionHandling]
 public interface IUserService
 {     
     [Rest(Method = RestMethods.Get)]

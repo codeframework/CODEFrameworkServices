@@ -68,13 +68,12 @@ namespace CODE.Framework.Fundamentals.Utilities
         {
             if (Loggers == null) return;
 
-            var exceptionText = leadingText + "\r\n\r\n" + ExceptionHelper.GetExceptionText(exception);
+            var exceptionText = $"{leadingText}{Environment.NewLine}{Environment.NewLine}{ExceptionHelper.GetExceptionText(exception)}";
 
             foreach (var logger in Loggers)
                 if (logger.TypeFilter == LogEventType.Undefined || ((logger.TypeFilter & type) == type))
                 {
-                    var exceptionLogger = logger as IExceptionLogger;
-                    if (exceptionLogger != null)
+                    if (logger is IExceptionLogger exceptionLogger)
                         exceptionLogger.Log(leadingText, exception, type);
                     else
                         logger.Log(exceptionText, type);
@@ -85,10 +84,7 @@ namespace CODE.Framework.Fundamentals.Utilities
         /// Adds a new logger which wishes to be notified whenever something needs to be logged.
         /// </summary>
         /// <param name="logger">The logger object.</param>
-        public static void AddLogger(ILogger logger)
-        {
-            Loggers.Add(logger);
-        }
+        public static void AddLogger(ILogger logger) => Loggers.Add(logger);
 
         /// <summary>
         /// Removes all current loggers.

@@ -56,7 +56,7 @@ namespace CODE.Framework.Fundamentals.Utilities
                 sb.Append(table.Columns[counter].ColumnName.Trim());
             }
 
-            sb.Append("\r\n");
+            sb.Append($"{Environment.NewLine}");
 
             // We iterate over all rows, and all fields/columns
             for (var counter = 0; counter < table.Rows.Count; counter++)
@@ -75,7 +75,7 @@ namespace CODE.Framework.Fundamentals.Utilities
                 }
 
                 // End of record. We add a line feed
-                sb.Append("\r\n");
+                sb.Append($"{Environment.NewLine}");
             }
 
             return sb.ToString();
