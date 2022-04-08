@@ -67,7 +67,7 @@ public static class ServiceGardenLocal
     /// </example>
     public static void InjectTransientDependency<TInterface, TConcrete>() where TConcrete : new()
     {
-        if (!typeof(TConcrete).GetInterfaces().Contains(typeof(TInterface))) return; // TODO: Throw an exception!
+        if (!typeof(TConcrete).GetInterfaces().Contains(typeof(TInterface))) throw new DependencyInjectionException($"Type {typeof(TConcrete).Name} must implement interface {typeof(TInterface).Name}.");
         _transientDependencies.Add(typeof(TInterface), typeof(TConcrete));
         _useDependencyInjection = true;
     }
@@ -100,7 +100,7 @@ public static class ServiceGardenLocal
     /// </example>
     public static void InjectSingletonDependency<TInterface, TConcrete>() where TConcrete : new()
     {
-        if (!typeof(TConcrete).GetInterfaces().Contains(typeof(TInterface))) return; // TODO: Throw an exception!
+        if (!typeof(TConcrete).GetInterfaces().Contains(typeof(TInterface))) throw new DependencyInjectionException($"Type {typeof(TConcrete).Name} must implement interface {typeof(TInterface).Name}.");
         _singletonDependencies.Add(typeof(TInterface), new SingletonDependencyWrapper { Type = typeof(TConcrete) });
         _useDependencyInjection = true;
     }
@@ -190,7 +190,7 @@ public static class ServiceGardenLocal
         var parameterValues = new List<object>();
         foreach (var parameter in constructorParameters)
         {
-            if (!parameter.ParameterType.IsInterface) return null; // TODO: We should probably throw an exception!
+            if (!parameter.ParameterType.IsInterface) throw new DependencyInjectionException($"Parameter {parameter.Name} is not an interface type. Only interface types can be used for dependency injection.");
             if (_transientDependencies.ContainsKey(parameter.ParameterType))
             {
                 var concreteType = _transientDependencies[parameter.ParameterType];
@@ -209,7 +209,7 @@ public static class ServiceGardenLocal
                 }
             }
             else
-                return null; // TODO: We should probably throw an exception!
+                throw new DependencyInjectionException($"Type {parameter.ParameterType.Name} has no registered concrete implementation. Use ServiceGardenLocal.InjectDependency() during app startup, to speficy a concrete type for this dependency.");
         }
 
         var objectInstance = Activator.CreateInstance(serviceType, parameterValues.ToArray());
@@ -263,13 +263,18 @@ public class InProcessProxyHandler : IProxyHandler
                     var ex2 = ex;
                     if (ex2 is InvalidOperationException && ex2.InnerException != null)
                         ex2 = ex2.InnerException;
-                    return ServiceHelper.GetPopulatedFailureResponse(realMethod.ReturnType, ex, realMethod.DeclaringType.Name, realMethod.Name);
+                    return ServiceHelper.GetPopulatedFailureResponse(realMethod.ReturnType, ex2, realMethod.DeclaringType.Name, realMethod.Name);
                 }
                 else
-                    return null; // TODO: Throw an exception
+                    throw ex; // No handling desired, so we bubble the exception up
             }
         }
         else
-            return null; // TODO: Throw an exception
+            throw new Exception($"Method {method.Name} not found on type {_type.Name}.");
     }
+}
+
+public class DependencyInjectionException : Exception
+{
+    public DependencyInjectionException(string message) : base(message) { }
 }
