@@ -14,7 +14,7 @@ public static class ServiceHandlerExtensions
     /// <param name="optionsAction"></param>
     /// <returns></returns>
     [Obsolete("Use AddHostedServices() instead.")]
-    public static IServiceCollection AddServiceHandler(this IServiceCollection services, Action<ServiceHandlerConfiguration> optionsAction) => AddHostedServices(services, optionsAction);
+    public static IServiceCollection AddServiceHandler(this IServiceCollection services, Action<ServiceHandlerConfiguration> optionsAction = null) => AddHostedServices(services, optionsAction);
 
     /// <summary>
     /// Configures the system to enable service hosting (and all required features) and then sets up the hosted service objects
@@ -22,7 +22,7 @@ public static class ServiceHandlerExtensions
     /// <param name="services"></param>
     /// <param name="optionsAction"></param>
     /// <returns></returns>
-    public static IServiceCollection AddHostedServices(this IServiceCollection services, Action<ServiceHandlerConfiguration> optionsAction)
+    public static IServiceCollection AddHostedServices(this IServiceCollection services, Action<ServiceHandlerConfiguration> optionsAction = null)
     {
         // add strongly typed configuration
         services.AddOptions();
@@ -34,6 +34,7 @@ public static class ServiceHandlerExtensions
         var config = new ServiceHandlerConfiguration();
         serviceConfiguration.Bind("ServiceHandler", config);
         ServiceHandlerConfiguration.Current = config;
+
         optionsAction?.Invoke(config);
 
         foreach (var svc in config.Services)
@@ -126,6 +127,7 @@ public static class ServiceHandlerExtensions
     public static IApplicationBuilder UseServiceHandler(this IApplicationBuilder appBuilder)
     {
         var serviceConfig = ServiceHandlerConfiguration.Current;
+        if (serviceConfig == null) throw new Exception("CODE Framework hosted services must be configured before UseOpenApiHandler() can be called. Use AddHostedServices() to configure which services are to be present in the hosting environment.");
 
         if (serviceConfig.Cors.UseCorsPolicy)
             appBuilder.UseCors(serviceConfig.Cors.CorsPolicyName);
@@ -242,6 +244,7 @@ public static class ServiceHandlerExtensions
         }
 
         var serviceConfig = ServiceHandlerConfiguration.Current;
+        if (serviceConfig == null) throw new Exception("CODE Framework hosted services must be configured before UseOpenApiHandler() can be called. Use AddHostedServices() to configure which services are to be present in the hosting environment.");
 
         // Endpoints require routing, so we make sure it is there
         appBuilder.UseRouting();
