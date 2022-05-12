@@ -2,6 +2,7 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace CODE.Framework.Services.Contracts;
 
@@ -40,8 +41,24 @@ public static class ServiceHelper
 
     public static object GetPopulatedFailureResponse(Type responseType, Exception ex, string typeName = "", string methodName = "")
     {
-        var response = Activator.CreateInstance(responseType);
-        return GetPopulatedFailureResponse(ex, response, 2, typeName, methodName);
+        var returnIsAsyncTask = false;
+        if (responseType.IsGenericType && responseType.Name == "Task`1")
+            returnIsAsyncTask = true;
+
+        if (!returnIsAsyncTask)
+        {
+            var response = Activator.CreateInstance(responseType);
+            return GetPopulatedFailureResponse(ex, response, 2, typeName, methodName);
+        }
+
+        // We are dealing with an async operation, so things are a bit more complicated
+        var genericTypes = responseType.GetGenericArguments();
+        if (genericTypes.Length != 1)
+            throw new Exception($"ServiceHelper.GetPopulatedFailureResponse() can only handle single-generic-parameter return values of generic type.");
+
+        var response2 = Activator.CreateInstance(genericTypes[0]);
+        var response3 = GetPopulatedFailureResponse(ex, response2, 2, typeName, methodName);
+        return Task.FromResult(response3);
     }
 
     private static TResponse GetPopulatedFailureResponse<TResponse>(Exception ex, TResponse response, int stackDepth, string typeName = "", string methodName = "") where TResponse : new()

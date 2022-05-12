@@ -1,5 +1,6 @@
 ﻿using Sample.Contracts;
 using Sample.Services.Implementation.Properties;
+using System.Threading.Tasks;
 
 namespace Sample.Services.Implementation;
 
@@ -19,7 +20,26 @@ public class CustomerService : ICustomerService, IServiceEvents
 
         // Real code goes here...
 
-        response.CustomerList = new List<Customer> 
+        response.CustomerList = new List<Customer>
+        {
+            new Customer { Name = "Markus Egger", Company = "CODE" },
+            new Customer { Name = "Ellen Whitney", Company = "CODE" },
+            new Customer { Name = "Mike Yeager", Company = "CODE" },
+            new Customer { Name = "Otto Dobretsberger", Company = "CODE" }
+        };
+
+        // var x = response.CustomerList[20];   // Put this line in to simulare an exception and trigger automatic exception handline
+
+        return response;
+    }
+
+    public async Task<GetCustomersResponse> GetCustomersAsync(GetCustomersRequest request)
+    {
+        var response = new GetCustomersResponse();
+
+        // Real code goes here...
+
+        response.CustomerList = new List<Customer>
         {
             new Customer { Name = "Markus Egger", Company = "CODE" },
             new Customer { Name = "Ellen Whitney", Company = "CODE" },

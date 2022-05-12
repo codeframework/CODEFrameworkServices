@@ -602,7 +602,7 @@ public static class OpenApiHelper
                         pathInfo.PositionalParameters.Add(new OpenApiPositionalOperationParameter { Name = parameterProperty.Name, Type = parameterProperty.PropertyType, PositionIndex = restUrParameterAttribute.Sequence, Description = description });
                     else
                     {
-                        var isRequired = true;
+                        var isRequired = false;
                         var dataMemberAttribute = parameterProperty.GetCustomAttributeEx<DataMemberAttribute>();
                         if (dataMemberAttribute != null)
                             isRequired = dataMemberAttribute.IsRequired;

@@ -1,4 +1,6 @@
-﻿namespace Sample.Contracts;
+﻿using System.Threading.Tasks;
+
+namespace Sample.Contracts;
 
 /// <summary>
 /// Service operations related to customers
@@ -27,6 +29,14 @@ public interface ICustomerService
     /// </summary>
     [OperationContract, Rest(Method = RestMethods.Get, Name = "")]
     GetCustomersResponse GetCustomers(GetCustomersRequest request);
+
+    /// <summary>
+    /// Example version of the GetCutomers() method using async syntax
+    /// </summary>
+    /// <param name="request"></param>
+    /// <returns></returns>
+    [OperationContract, Rest(Method = RestMethods.Get, Name = "Customers2")]
+    Task<GetCustomersResponse> GetCustomersAsync(GetCustomersRequest request);
 
     /// <summary>
     /// Example of searching for customers
