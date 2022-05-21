@@ -56,7 +56,7 @@ public class ServiceHandlerConfigurationInstance
     /// The base route to access this service instance
     /// Example: /api/users
     /// </summary>
-    public string RouteBasePath { get; set; }
+    public string RouteBasePath { get; set; } = string.Empty;
 
     public ControllerHttpsMode HttpsMode { get; set; } = ControllerHttpsMode.Http;
 

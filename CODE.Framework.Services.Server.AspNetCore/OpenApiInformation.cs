@@ -1,4 +1,5 @@
-﻿using System.Xml;
+﻿using System.Threading.Tasks;
+using System.Xml;
 using DescriptionAttribute = CODE.Framework.Services.Contracts.DescriptionAttribute;
 
 namespace CODE.Framework.Services.Server.AspNetCore;
@@ -171,7 +172,7 @@ public class ComponentsJsonConverter : JsonConverter<Dictionary<string, OpenApiS
                     if (string.IsNullOrEmpty(value[definitionName].Description))
                         value[definitionName].Description = value[definitionName].ObsoleteReason;
                     else
-                        value[definitionName].Description +=  " Deprecated: " + value[definitionName].ObsoleteReason;
+                        value[definitionName].Description += $" Deprecated: {value[definitionName].ObsoleteReason}";
                 }
             }
 
@@ -517,6 +518,12 @@ public static class OpenApiHelper
 {
     public static OpenApiSchemaDefinition GetTypeDefinition(Type type, bool obsolete, string obsoleteReason, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles)
     {
+        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>))
+        {
+            var taskType = type.GetGenericArguments()[0];
+            return GetTypeDefinition(taskType, obsolete, obsoleteReason, xmlDocumentationFiles);
+        }
+        
         var schema = new OpenApiSchemaDefinition();
 
         schema.Name = type.FullName;
@@ -771,6 +778,11 @@ public static class OpenApiHelper
             var nulledType = type.GetGenericArguments()[0];
             return GetOpenApiType(nulledType);
         }
+        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>))
+        {
+            var taskType = type.GetGenericArguments()[0];
+            return GetOpenApiType(taskType);
+        }
         return string.Empty;
     }
 
@@ -792,6 +804,11 @@ public static class OpenApiHelper
         {
             var nulledType = type.GetGenericArguments()[0];
             return GetOpenApiTypeFormat(nulledType, property);
+        }
+        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>))
+        {
+            var taskType = type.GetGenericArguments()[0];
+            return GetOpenApiTypeFormat(taskType, property);
         }
         return string.Empty;
     }
