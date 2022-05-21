@@ -296,10 +296,7 @@ public class ComponentsJsonConverter : JsonConverter<Dictionary<string, OpenApiS
             }
         }
         else
-        {
-            writer.WritePropertyName("$ref");
-            writer.WriteStringValue($"#/components/schemas/{propertyType.FullName}");
-        }
+            OpenApiHelper.WriteSchemaReference(propertyType, writer);
     }
 
     private static void WriteDefaultValue(Utf8JsonWriter writer, Type propertyType, PropertyInfo propertyInfo, object parentObject)
@@ -486,8 +483,7 @@ public class PathJsonConverter : JsonConverter<Dictionary<string, OpenApiPathInf
                     writer.WriteStartObject("application/json");
                     writer.WritePropertyName("schema");
                     writer.WriteStartObject();
-                    writer.WritePropertyName("$ref");
-                    writer.WriteStringValue($"#/components/schemas/{path.Payload.Type.FullName}");
+                    OpenApiHelper.WriteSchemaReference(path.Payload.Type, writer);
                     writer.WriteEndObject();
                     writer.WriteEndObject();
                     writer.WriteEndObject();
@@ -522,10 +518,7 @@ public class PathJsonConverter : JsonConverter<Dictionary<string, OpenApiPathInf
 
                 var openApiType = OpenApiHelper.GetOpenApiType(path.ReturnType);
                 if (string.IsNullOrEmpty(openApiType))
-                {
-                    writer.WritePropertyName("$ref");
-                    writer.WriteStringValue($"#/components/schemas/{path.ReturnType}");
-                }
+                    OpenApiHelper.WriteSchemaReference(path.ReturnType, writer);
                 else
                 {
                     // This should really not happen, since it doesn't follow standard CODE Framework patterns.
@@ -600,6 +593,25 @@ public class PathJsonConverter : JsonConverter<Dictionary<string, OpenApiPathInf
 
 public static class OpenApiHelper
 {
+    public static void WriteSchemaReference(Type type, Utf8JsonWriter writer)
+    {
+        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
+        {
+            var nulledType = type.GetGenericArguments()[0];
+            WriteSchemaReference(nulledType, writer);
+            return;
+        }
+        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>))
+        {
+            var taskType = type.GetGenericArguments()[0];
+            WriteSchemaReference(taskType, writer);
+            return;
+        }
+
+        writer.WritePropertyName("$ref");
+        writer.WriteStringValue($"#/components/schemas/{type.FullName}");
+    }
+
     public static OpenApiSchemaDefinition GetTypeDefinition(Type type, bool obsolete, string obsoleteReason, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles)
     {
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>))
