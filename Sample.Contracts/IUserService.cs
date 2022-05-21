@@ -137,7 +137,7 @@ public class AuthenticateUserRequest : BaseServiceRequest
     public string Password { get; set; } = string.Empty;
 
     [DataMember(IsRequired = false)]
-    [RestUrlParameter(Mode = UrlParameterMode.Named)]
+    //[RestUrlParameter(Mode = UrlParameterMode.Named)] // This is the default anyway.
     [Description("Boolean flag, indicating whether the user should be remembered. (*False by default*)")]
     public bool RememberMe { get; set; } = false;
 }

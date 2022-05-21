@@ -601,20 +601,20 @@ public static class OpenApiHelper
             var parameterProperties = parameter.ParameterType.GetProperties();
             foreach (var parameterProperty in parameterProperties)
             {
-                var description = OpenApiHelper.GetDescription(parameterProperty, xmlDocumentationFiles);
+                var description = GetDescription(parameterProperty, xmlDocumentationFiles);
 
-                var restUrParameterAttribute = parameterProperty.GetCustomAttributeEx<RestUrlParameterAttribute>();
-                if (restUrParameterAttribute != null)
-                    if (restUrParameterAttribute.Mode == UrlParameterMode.Inline)
-                        pathInfo.PositionalParameters.Add(new OpenApiPositionalOperationParameter { Name = parameterProperty.Name, Type = parameterProperty.PropertyType, PositionIndex = restUrParameterAttribute.Sequence, Description = description });
-                    else
-                    {
-                        var isRequired = false;
-                        var dataMemberAttribute = parameterProperty.GetCustomAttributeEx<DataMemberAttribute>();
-                        if (dataMemberAttribute != null)
-                            isRequired = dataMemberAttribute.IsRequired;
-                        pathInfo.NamedParameters.Add(new OpenApiNamedOperationParameter { Name = parameterProperty.Name, Type = parameterProperty.PropertyType, Required = isRequired, Description = description });
-                    }
+                var restUrlParameterAttribute = parameterProperty.GetCustomAttributeEx<RestUrlParameterAttribute>();
+                if (restUrlParameterAttribute == null) restUrlParameterAttribute = new RestUrlParameterAttribute(); // Getting the defaults
+                if (restUrlParameterAttribute.Mode == UrlParameterMode.Inline)
+                    pathInfo.PositionalParameters.Add(new OpenApiPositionalOperationParameter { Name = parameterProperty.Name, Type = parameterProperty.PropertyType, PositionIndex = restUrlParameterAttribute.Sequence, Description = description });
+                else
+                {
+                    var isRequired = false;
+                    var dataMemberAttribute = parameterProperty.GetCustomAttributeEx<DataMemberAttribute>();
+                    if (dataMemberAttribute != null)
+                        isRequired = dataMemberAttribute.IsRequired;
+                    pathInfo.NamedParameters.Add(new OpenApiNamedOperationParameter { Name = parameterProperty.Name, Type = parameterProperty.PropertyType, Required = isRequired, Description = description });
+                }
 
             }
         }
