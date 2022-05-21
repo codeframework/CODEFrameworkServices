@@ -347,7 +347,7 @@ public static class ServiceHandlerExtensions
 
                 if (httpVerb == "get")
                     // Get operations do not have a payload/body, so everything must be coming in from the URL
-                    OpenApiHelper.ExtractOpenApiParameters(interfaceMethod, pathInfo, xmlDocumentationFiles);
+                    OpenApiHelper.ExtractOpenApiParameters(interfaceMethod, pathInfo, xmlDocumentationFiles, true);
                 else
                 {
                     var methodParameters = interfaceMethod.GetParameters();

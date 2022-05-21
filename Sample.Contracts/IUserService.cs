@@ -112,7 +112,11 @@ public class ResetPasswordResponse : BaseServiceResponse { }
 public class SignoutResponse : BaseServiceResponse { }
 
 [DataContract]
-public class IsAuthenticatedRequest : BaseServiceRequest { }
+public class IsAuthenticatedRequest : BaseServiceRequest 
+{
+    [DataMember]
+    public bool IgnoreExpired { get; set; } = true;
+}
 
 [DataContract]
 public class IsAuthenticatedResponse : BaseServiceResponse

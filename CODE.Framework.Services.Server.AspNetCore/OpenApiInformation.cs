@@ -67,11 +67,17 @@ public class OpenApiPathInfo
 
 public class OpenApiSchemaDefinition
 {
+    public OpenApiSchemaDefinition(Type type)
+    {
+        Type = type;
+    }
+
     public string Name { get; set; }
     public string Description { get; set; }
     public Dictionary<string, OpenApiPropertyDefinition> Properties { get; } = new Dictionary<string, OpenApiPropertyDefinition>();
     public bool Obsolete { get; set; }
     public string ObsoleteReason { get; set; }
+    public Type Type { get; private set; }
 }
 
 public class OpenApiPropertyDefinition
@@ -184,11 +190,18 @@ public class ComponentsJsonConverter : JsonConverter<Dictionary<string, OpenApiS
 
             writer.WriteStartObject("properties");
 
+            object typeInstance = null;
+            try
+            {
+                typeInstance = ObjectHelper.CreateInstanceFromType(value[definitionName].Type);
+            }
+            catch { } // Can't really do anything about it, although it is very odd
+
             foreach (var propertyName in value[definitionName].Properties.Keys)
             {
                 var prop = value[definitionName].Properties[propertyName];
                 writer.WriteStartObject(propertyName);
-                WritePropertyTypeInformation(prop.Type, writer, prop.PropertyInfo, prop.Description, prop.Obsolete, prop.ObsoleteReason);
+                WritePropertyTypeInformation(prop.Type, writer, prop.PropertyInfo, prop.Description, prop.Obsolete, prop.ObsoleteReason, typeInstance);
                 writer.WriteEndObject();
             }
 
@@ -199,7 +212,7 @@ public class ComponentsJsonConverter : JsonConverter<Dictionary<string, OpenApiS
         writer.WriteEndObject();
     }
 
-    private void WritePropertyTypeInformation(Type propertyType, Utf8JsonWriter writer, PropertyInfo propertyInfo, string description = null, bool obsolete = false, string obsoleteReason = "")
+    private void WritePropertyTypeInformation(Type propertyType, Utf8JsonWriter writer, PropertyInfo propertyInfo, string description = null, bool obsolete = false, string obsoleteReason = "", object parentObject = null)
     {
         var typeString = OpenApiHelper.GetOpenApiType(propertyType);
         if (!string.IsNullOrEmpty(typeString))
@@ -244,6 +257,8 @@ public class ComponentsJsonConverter : JsonConverter<Dictionary<string, OpenApiS
                 }
             }
 
+            WriteDefaultValue(writer, propertyType, propertyInfo, parentObject);
+
             if (!string.IsNullOrEmpty(description))
             {
                 writer.WritePropertyName("description");
@@ -284,6 +299,75 @@ public class ComponentsJsonConverter : JsonConverter<Dictionary<string, OpenApiS
         {
             writer.WritePropertyName("$ref");
             writer.WriteStringValue($"#/components/schemas/{propertyType.FullName}");
+        }
+    }
+
+    private static void WriteDefaultValue(Utf8JsonWriter writer, Type propertyType, PropertyInfo propertyInfo, object parentObject)
+    {
+        if (parentObject != null)
+        {
+            var defaultValue = propertyInfo.GetValue(parentObject);
+            if (defaultValue != null)
+            {
+                if (propertyType.IsEnum)
+                {
+                    writer.WritePropertyName("default");
+                    writer.WriteNumberValue((int)defaultValue);
+                }
+                else if (propertyType == typeof(string) || propertyType == typeof(char))
+                {
+                    var defaultString = defaultValue.ToString();
+                    if (!string.IsNullOrEmpty(defaultString))
+                    {
+                        writer.WritePropertyName("default");
+                        writer.WriteStringValue(defaultString);
+                    }
+                }
+                else if (propertyType == typeof(Guid))
+                {
+                    writer.WritePropertyName("default");
+                    writer.WriteStringValue(((Guid)defaultValue).ToString());
+                }
+                else if (propertyType == typeof(int))
+                {
+                    writer.WritePropertyName("default");
+                    writer.WriteNumberValue((int)defaultValue);
+                }
+                else if (propertyType == typeof(short))
+                {
+                    writer.WritePropertyName("default");
+                    writer.WriteNumberValue((short)defaultValue);
+                }
+                else if (propertyType == typeof(long))
+                {
+                    writer.WritePropertyName("default");
+                    writer.WriteNumberValue((long)defaultValue);
+                }
+                else if (propertyType == typeof(decimal))
+                {
+                    writer.WritePropertyName("default");
+                    writer.WriteNumberValue((decimal)defaultValue);
+                }
+                else if (propertyType == typeof(double))
+                {
+                    writer.WritePropertyName("default");
+                    writer.WriteNumberValue((double)defaultValue);
+                }
+                else if (propertyType == typeof(DateTime))
+                {
+                    var defaultDateTime = (DateTime)defaultValue;
+                    if (defaultDateTime != DateTime.MinValue && defaultDateTime != DateTime.MaxValue)
+                    {
+                        writer.WritePropertyName("default");
+                        writer.WriteStringValue((DateTime)defaultValue); // TODO: This is probably not right in terms of the format
+                    }
+                }
+                else if (propertyType == typeof(bool))
+                {
+                    writer.WritePropertyName("default");
+                    writer.WriteBooleanValue((bool)defaultValue);
+                }
+            }
         }
     }
 }
@@ -524,7 +608,7 @@ public static class OpenApiHelper
             return GetTypeDefinition(taskType, obsolete, obsoleteReason, xmlDocumentationFiles);
         }
         
-        var schema = new OpenApiSchemaDefinition();
+        var schema = new OpenApiSchemaDefinition(type);
 
         schema.Name = type.FullName;
         schema.Obsolete = obsolete;
@@ -592,7 +676,7 @@ public static class OpenApiHelper
         }
     }
 
-    public static void ExtractOpenApiParameters(MethodInfo methodInfo, OpenApiPathInfo pathInfo, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles)
+    public static void ExtractOpenApiParameters(MethodInfo methodInfo, OpenApiPathInfo pathInfo, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles, bool isGet = false)
     {
         var methodParameters = methodInfo.GetParameters();
         if (methodParameters.Length > 0)
@@ -604,17 +688,18 @@ public static class OpenApiHelper
                 var description = GetDescription(parameterProperty, xmlDocumentationFiles);
 
                 var restUrlParameterAttribute = parameterProperty.GetCustomAttributeEx<RestUrlParameterAttribute>();
-                if (restUrlParameterAttribute == null) restUrlParameterAttribute = new RestUrlParameterAttribute(); // Getting the defaults
-                if (restUrlParameterAttribute.Mode == UrlParameterMode.Inline)
-                    pathInfo.PositionalParameters.Add(new OpenApiPositionalOperationParameter { Name = parameterProperty.Name, Type = parameterProperty.PropertyType, PositionIndex = restUrlParameterAttribute.Sequence, Description = description });
-                else
-                {
-                    var isRequired = false;
-                    var dataMemberAttribute = parameterProperty.GetCustomAttributeEx<DataMemberAttribute>();
-                    if (dataMemberAttribute != null)
-                        isRequired = dataMemberAttribute.IsRequired;
-                    pathInfo.NamedParameters.Add(new OpenApiNamedOperationParameter { Name = parameterProperty.Name, Type = parameterProperty.PropertyType, Required = isRequired, Description = description });
-                }
+                if (restUrlParameterAttribute == null && isGet) restUrlParameterAttribute = new RestUrlParameterAttribute(); // Getting the defaults
+                if (restUrlParameterAttribute != null)
+                    if (restUrlParameterAttribute.Mode == UrlParameterMode.Inline)
+                        pathInfo.PositionalParameters.Add(new OpenApiPositionalOperationParameter { Name = parameterProperty.Name, Type = parameterProperty.PropertyType, PositionIndex = restUrlParameterAttribute.Sequence, Description = description });
+                    else
+                    {
+                        var isRequired = false;
+                        var dataMemberAttribute = parameterProperty.GetCustomAttributeEx<DataMemberAttribute>();
+                        if (dataMemberAttribute != null)
+                            isRequired = dataMemberAttribute.IsRequired;
+                        pathInfo.NamedParameters.Add(new OpenApiNamedOperationParameter { Name = parameterProperty.Name, Type = parameterProperty.PropertyType, Required = isRequired, Description = description });
+                    }
 
             }
         }
