@@ -303,7 +303,15 @@ public class ComponentsJsonConverter : JsonConverter<Dictionary<string, OpenApiS
     {
         if (parentObject != null)
         {
-            var defaultValue = propertyInfo.GetValue(parentObject);
+            object defaultValue = null;
+            try
+            {
+                defaultValue = propertyInfo.GetValue(parentObject);
+            }
+            catch
+            {
+                defaultValue = null;
+            }
             if (defaultValue != null)
             {
                 if (propertyType.IsEnum)
