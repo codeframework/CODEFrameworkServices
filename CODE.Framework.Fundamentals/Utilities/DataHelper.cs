@@ -234,6 +234,35 @@ namespace CODE.Framework.Fundamentals.Utilities
         }
 
         /// <summary>
+        /// Safely converts a value into an integer or returns 0 if the value is invalid.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <returns></returns>
+        /// <remarks>
+        /// This method is an extension method
+        /// </remarks>
+        /// <example>
+        /// using EPS.Utilities;
+        /// 
+        /// // more code here
+        /// 
+        /// int myInt = dataSet.Tables[0].Rows[0]["number"].ToIntegerSave();
+        /// </example>
+        public static long ToLongSafe(this object value)
+        {
+            if (value == null) return 0;
+
+            try
+            {
+                return value != DBNull.Value ? (long)value : 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        /// <summary>
         /// Safely converts a value into a double or returns 0.0 if the value is invalid.
         /// </summary>
         /// <param name="value">The value.</param>
