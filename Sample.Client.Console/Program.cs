@@ -8,8 +8,8 @@ ConfigurationSettings.Sources["Memory"].Settings["RestServiceUrl:IUserService"] 
 
 var originalColor = Console.ForegroundColor;
 
-Console.WriteLine("CODE Framework Service Example Test Client.\r");
-Console.WriteLine("Press key to call ICustomerService.GetCustomers().\r");
+Console.WriteLine($"CODE Framework Service Example Test Client.{Environment.NewLine}");
+Console.WriteLine($"Press key to call ICustomerService.GetCustomers().{Environment.NewLine}");
 Console.ReadLine();
 
 ServiceClient.Call<ICustomerService>(c =>
@@ -22,14 +22,14 @@ ServiceClient.Call<ICustomerService>(c =>
         if (response.Success)
         {
             Console.ForegroundColor = ConsoleColor.DarkGreen;
-            Console.WriteLine("Customers Retrieved:\r");
+            Console.WriteLine($"Customers Retrieved:{Environment.NewLine}");
             foreach (var customer in response.CustomerList)
                 Console.WriteLine($"Customer: {customer.Name} - Company: {customer.Company}");
         }
         else
         {
             Console.ForegroundColor = ConsoleColor.DarkBlue;
-            Console.WriteLine($"Service call returned Success = false. Failure Information: {response.FailureInformation}\r");
+            Console.WriteLine($"Service call returned Success = false. Failure Information: {response.FailureInformation}{Environment.NewLine}");
         }
     }
     catch (Exception e)
@@ -42,7 +42,7 @@ ServiceClient.Call<ICustomerService>(c =>
 
 Console.ForegroundColor = originalColor;
 Console.WriteLine();
-Console.WriteLine("Press key to call ICustomerService.SearchTest().\r");
+Console.WriteLine($"Press key to call ICustomerService.SearchTest().{Environment.NewLine}");
 Console.ReadLine();
 
 ServiceClient.Call<ICustomerService>(c =>
@@ -61,7 +61,7 @@ ServiceClient.Call<ICustomerService>(c =>
         else
         {
             Console.ForegroundColor = ConsoleColor.DarkBlue;
-            Console.WriteLine($"Service call returned Success = false. Failure Information: {response.FailureInformation}\r");
+            Console.WriteLine($"Service call returned Success = false. Failure Information: {response.FailureInformation}{Environment.NewLine}");
         }
     }
     catch (Exception e)
@@ -74,7 +74,7 @@ ServiceClient.Call<ICustomerService>(c =>
 
 Console.ForegroundColor = originalColor;
 Console.WriteLine();
-Console.WriteLine("Press key to call ICustomerService.DateTest().\r");
+Console.WriteLine($"Press key to call ICustomerService.DateTest().{Environment.NewLine}");
 Console.ReadLine();
 
 ServiceClient.Call<ICustomerService>(c =>
@@ -93,7 +93,7 @@ ServiceClient.Call<ICustomerService>(c =>
         else
         {
             Console.ForegroundColor = ConsoleColor.DarkBlue;
-            Console.WriteLine($"Service call returned Success = false. Failure Information: {response.FailureInformation}\r");
+            Console.WriteLine($"Service call returned Success = false. Failure Information: {response.FailureInformation}{Environment.NewLine}");
         }
     }
     catch (Exception e)
@@ -106,7 +106,7 @@ ServiceClient.Call<ICustomerService>(c =>
 
 Console.ForegroundColor = originalColor;
 Console.WriteLine();
-Console.WriteLine("Press key to call ICustomerService.GetPhoto().\r");
+Console.WriteLine($"Press key to call ICustomerService.GetPhoto().{Environment.NewLine}");
 Console.ReadLine();
 
 ServiceClient.Call<ICustomerService>(s =>
