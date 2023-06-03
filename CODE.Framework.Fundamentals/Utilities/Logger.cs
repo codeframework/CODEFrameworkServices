@@ -374,7 +374,7 @@ namespace CODE.Framework.Fundamentals.Utilities
             if (File.Exists(fileName)) File.Delete(fileName);
             using (var stream = new FileStream(fileName, FileMode.CreateNew, FileAccess.ReadWrite))
             {
-                var writer = new XmlTextWriter(stream, Encoding.UTF8) {Formatting = Formatting.Indented, Indentation = 2};
+                var writer = new XmlTextWriter(stream, Encoding.UTF8) { Formatting = Formatting.Indented, Indentation = 2 };
                 document.Save(writer);
                 writer.Close();
                 stream.Close();
@@ -649,7 +649,7 @@ namespace CODE.Framework.Fundamentals.Utilities
             if (File.Exists(fileName)) File.Delete(fileName);
             using (var stream = new FileStream(fileName, FileMode.CreateNew, FileAccess.ReadWrite))
             {
-                var writer = new XmlTextWriter(stream, Encoding.UTF8) {Formatting = Formatting.Indented, Indentation = 2};
+                var writer = new XmlTextWriter(stream, Encoding.UTF8) { Formatting = Formatting.Indented, Indentation = 2 };
                 xml.Save(writer);
                 writer.Close();
                 stream.Close();
@@ -713,7 +713,6 @@ namespace CODE.Framework.Fundamentals.Utilities
         }
     }
 
-#if NETFULL
     /// <summary>
     /// Event log logger class
     /// </summary>
@@ -736,16 +735,13 @@ namespace CODE.Framework.Fundamentals.Utilities
         /// <summary>
         /// For internal use only
         /// </summary>
-        private readonly EventLog _eventLog = new EventLog();
+        private readonly EventLog _eventLog = new();
 
         /// <summary>
         /// Internal reference to the actual event log object
         /// </summary>
         /// <value>The event log.</value>
-        protected EventLog InternalEventLog
-        {
-            get { return _eventLog; }
-        }
+        protected EventLog InternalEventLog => _eventLog;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EventLogLogger"/> class.
@@ -760,8 +756,9 @@ namespace CODE.Framework.Fundamentals.Utilities
         /// <param name="logName">Name of the log as it appears in the windows system log.</param>
         public EventLogLogger(string logName)
         {
-            InternalEventLog.Log = logName;
-            InternalEventLog.Source = "Undefined";
+            var log = InternalEventLog;
+            log.Log = logName;
+            log.Source = "Undefined";
         }
 
         /// <summary>
@@ -771,10 +768,11 @@ namespace CODE.Framework.Fundamentals.Utilities
         /// <param name="machineName">Name of the machine the log resides on. (Current/local machine = ".")</param>
         public EventLogLogger(string logName, string machineName)
         {
-            InternalEventLog.Log = logName;
+            var log = InternalEventLog;
+            log.Log = logName;
             if (string.IsNullOrEmpty(machineName)) machineName = ".";
-            InternalEventLog.MachineName = machineName;
-            InternalEventLog.Source = "Undefined";
+            log.MachineName = machineName;
+            log.Source = "Undefined";
         }
 
         /// <summary>
@@ -785,10 +783,11 @@ namespace CODE.Framework.Fundamentals.Utilities
         /// <param name="sourceName">Name of the source (typically the name of the current application).</param>
         public EventLogLogger(string logName, string machineName, string sourceName)
         {
-            InternalEventLog.Log = logName;
+            var log = InternalEventLog;
+            log.Log = logName;
             if (string.IsNullOrEmpty(machineName)) machineName = ".";
-            InternalEventLog.MachineName = machineName;
-            InternalEventLog.Source = sourceName;
+            log.MachineName = machineName;
+            log.Source = sourceName;
         }
 
         /// <summary>
@@ -805,11 +804,11 @@ namespace CODE.Framework.Fundamentals.Utilities
         /// LogEventType.Success    = EventLogEntryType.SuccessAudit
         ///    other:               = EventLogEntryType.Information
         /// </remarks>
-        public override void Log(string logEvent, LogEventType type)
+        public override void Log(string logEvent, LogEventType type = LogEventType.Information)
         {
             // We make sure the source exists
             if (!EventLog.SourceExists(InternalEventLog.Source, InternalEventLog.MachineName))
-                EventLog.CreateEventSource(new EventSourceCreationData(InternalEventLog.Source, InternalEventLog.Log) {MachineName = InternalEventLog.MachineName});
+                EventLog.CreateEventSource(new EventSourceCreationData(InternalEventLog.Source, InternalEventLog.Log) { MachineName = InternalEventLog.MachineName });
 
             // We are ready to log the event
             if (type == LogEventType.Undefined)
@@ -817,14 +816,21 @@ namespace CODE.Framework.Fundamentals.Utilities
             else
             {
                 EventLogEntryType systemType;
-                if ((type & LogEventType.Critical) == LogEventType.Critical) systemType = EventLogEntryType.Error;
-                else if (((type & LogEventType.Error) == LogEventType.Error) || ((type & LogEventType.Exception) == LogEventType.Exception)) systemType = EventLogEntryType.FailureAudit;
-                else if ((type & LogEventType.Warning) == LogEventType.Warning) systemType = EventLogEntryType.Warning;
-                else if ((type & LogEventType.Success) == LogEventType.Success) systemType = EventLogEntryType.SuccessAudit;
-                else systemType = EventLogEntryType.Information;
+                if ((type & LogEventType.Critical) == LogEventType.Critical)
+                    systemType = EventLogEntryType.Error;
+                else if ((type & LogEventType.Error) == LogEventType.Error)
+                    systemType = EventLogEntryType.FailureAudit;
+                else if ((type & LogEventType.Exception) == LogEventType.Exception)
+                    systemType = EventLogEntryType.FailureAudit;
+                else if ((type & LogEventType.Warning) == LogEventType.Warning) 
+                    systemType = EventLogEntryType.Warning;
+                else if ((type & LogEventType.Success) == LogEventType.Success) 
+                    systemType = EventLogEntryType.SuccessAudit;
+                else 
+                    systemType = EventLogEntryType.Information;
+
                 InternalEventLog.WriteEntry(logEvent, systemType);
             }
         }
     }
-#endif
 }

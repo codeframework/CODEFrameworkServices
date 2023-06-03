@@ -25,6 +25,12 @@ public interface ICustomerService
     GetCustomerResponse GetCustomer(GetCustomerRequest request);
 
     /// <summary>
+    /// Deletes a single customer
+    /// </summary>
+    [OperationContract, Rest(Method = RestMethods.Delete, Name = "Customer", AuthorizationRoles = "Administrators")]
+    DeleteCustomerResponse DeleteCustomer(DeleteCustomerRequest request);
+
+    /// <summary>
     /// Retrieves a list of customers
     /// </summary>
     [OperationContract, Rest(Method = RestMethods.Get, Name = "")]
@@ -182,6 +188,23 @@ public class GetCustomersResponse : BaseServiceResponse
 {
     [DataMember]
     public List<Customer> CustomerList { get; set; } = new List<Customer>();
+}
+
+[DataContract]
+public class DeleteCustomerRequest : BaseServiceRequest
+{
+    /// <summary>
+    /// Customer ID (free-form string value)
+    /// </summary>
+    [DataMember, RestUrlParameter(Mode = UrlParameterMode.Inline)]
+    public string Id { get; set; }
+}
+
+[DataContract]
+public class DeleteCustomerResponse : BaseServiceResponse
+{
+    [DataMember]
+    public string DeletedCustomerId { get; set; }
 }
 
 [DataContract]

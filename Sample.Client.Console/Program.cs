@@ -42,6 +42,68 @@ ServiceClient.Call<ICustomerService>(c =>
 
 Console.ForegroundColor = originalColor;
 Console.WriteLine();
+Console.WriteLine($"Press key to call ICustomerService.GetCustomer().{Environment.NewLine}");
+Console.ReadLine();
+
+ServiceClient.Call<ICustomerService>(c =>
+{
+    try
+    {
+        Console.WriteLine("Calling service....");
+
+        var response = c.GetCustomer(new GetCustomerRequest());
+        if (response.Success)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkGreen;
+            Console.WriteLine($"Customer Retrieved: {response.Customer.Name}{Environment.NewLine}");
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.DarkBlue;
+            Console.WriteLine($"Service call returned Success = false. Failure Information: {response.FailureInformation}{Environment.NewLine}");
+        }
+    }
+    catch (Exception e)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine(e);
+        throw;
+    }
+});
+
+Console.ForegroundColor = originalColor;
+Console.WriteLine();
+Console.WriteLine($"Press key to call ICustomerService.DeleteCustomer().{Environment.NewLine}");
+Console.ReadLine();
+
+ServiceClient.Call<ICustomerService>(c =>
+{
+    try
+    {
+        Console.WriteLine("Calling service....");
+
+        var response = c.DeleteCustomer(new DeleteCustomerRequest { Id = "Egger" });
+        if (response.Success)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkGreen;
+            Console.WriteLine($"Customer Deleted: {response.DeletedCustomerId}{Environment.NewLine}");
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.DarkBlue;
+            Console.WriteLine($"Service call returned Success = false. Failure Information: {response.FailureInformation}{Environment.NewLine}");
+        }
+    }
+    catch (Exception e)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine(e);
+        throw;
+    }
+});
+
+Console.ForegroundColor = originalColor;
+Console.WriteLine();
 Console.WriteLine($"Press key to call ICustomerService.SearchTest().{Environment.NewLine}");
 Console.ReadLine();
 

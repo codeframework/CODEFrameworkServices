@@ -136,7 +136,8 @@ public static class RestHelper
             var propertyValue = inlineProperty.GetValue(objectToSerialize, null);
             sb.Append(GetSerializedParameterValue(propertyValue));
         }
-        if (httpMethod == "GET" && namedParameterProperties.Count > 0)
+        //if (httpMethod == "GET" && namedParameterProperties.Count > 0)
+        if (namedParameterProperties.Count > 0)
         {
             var isFirst = true;
             foreach (var namedProperty in namedParameterProperties)

@@ -2,10 +2,10 @@
 
 	<PropertyGroup>
 		<TargetFramework>net6.0</TargetFramework>
-		<AssemblyVersion>2.0.12.0</AssemblyVersion>
-		<FileVersion>2.0.12.0</FileVersion>
-		<Version>2.0.12</Version>
-		<Authors>Markus Egger Inc.</Authors>
+    <AssemblyVersion>2.0.13.0</AssemblyVersion>
+    <FileVersion>2.0.13.0</FileVersion>
+    <Version>2.0.13</Version>
+    <Authors>Markus Egger Inc.</Authors>
 		<Company>Markus Egger Inc.</Company>
 		<Product>CODE Framework</Product>
 		<Copyright>Markus Egger Inc., 2017-2022</Copyright>

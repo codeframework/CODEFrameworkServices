@@ -52,6 +52,15 @@ public class CustomerService : ICustomerService, IServiceEvents
         return response;
     }
 
+    public DeleteCustomerResponse DeleteCustomer(DeleteCustomerRequest request)
+    {
+        // Pretending to delete the customer for demonstration purposes
+        return new DeleteCustomerResponse
+        {
+            DeletedCustomerId = request.Id
+        };
+    }
+
     public SearchTestResponse SearchTest(SearchTestRequest request)
     {
         var response = new SearchTestResponse

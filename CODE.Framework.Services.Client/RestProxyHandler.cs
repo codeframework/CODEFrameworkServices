@@ -101,18 +101,20 @@ public class RestProxyHandler : IProxyHandler
                     client.Headers.Add("Content-Type", "application/json; charset=utf-8");
                     client.Encoding = Encoding.UTF8;
                     string restResponse;
+
+                    var serializedData = RestHelper.SerializeToUrlParameters(data);
+                    var serviceFullUrl = serviceUriAbsoluteUri + serializedData;
+
                     switch (httpMethod)
                     {
                         case "POST":
-                            restResponse = client.UploadString(serviceUriAbsoluteUri, JsonHelper.SerializeToRestJson(data));
+                            restResponse = client.UploadString(serviceFullUrl, JsonHelper.SerializeToRestJson(data));
                             break;
                         case "GET":
-                            var serializedData = RestHelper.SerializeToUrlParameters(data);
-                            var serviceFullUrl = serviceUriAbsoluteUri + serializedData;
                             restResponse = client.DownloadString(serviceFullUrl);
                             break;
                         default:
-                            restResponse = client.UploadString(serviceUriAbsoluteUri, httpMethod, JsonHelper.SerializeToRestJson(data));
+                            restResponse = client.UploadString(serviceFullUrl, httpMethod, JsonHelper.SerializeToRestJson(data));
                             break;
                     }
 
