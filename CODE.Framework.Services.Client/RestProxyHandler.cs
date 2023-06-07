@@ -62,7 +62,7 @@ public class RestProxyHandler : IProxyHandler
                             fileResponseContent = client.UploadData(serviceUriAbsoluteUri, Encoding.UTF8.GetBytes(JsonHelper.SerializeToRestJson(data)));
                             break;
                         case "GET":
-                            var serializedData = RestHelper.SerializeToUrlParameters(data);
+                            var serializedData = RestHelper.SerializeToUrlParameters(data, "GET");
                             var serviceFullUrl = serviceUriAbsoluteUri + serializedData;
                             fileResponseContent = client.DownloadData(serviceFullUrl);
                             break;
@@ -96,30 +96,28 @@ public class RestProxyHandler : IProxyHandler
             }
             else
             {
-                using (var client = new WebClient())
+                using var client = new WebClient();
+                client.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                client.Encoding = Encoding.UTF8;
+                string restResponse;
+
+                var serializedData = RestHelper.SerializeToUrlParameters(data, httpMethod);
+                var serviceFullUrl = serviceUriAbsoluteUri + serializedData;
+
+                switch (httpMethod)
                 {
-                    client.Headers.Add("Content-Type", "application/json; charset=utf-8");
-                    client.Encoding = Encoding.UTF8;
-                    string restResponse;
-
-                    var serializedData = RestHelper.SerializeToUrlParameters(data);
-                    var serviceFullUrl = serviceUriAbsoluteUri + serializedData;
-
-                    switch (httpMethod)
-                    {
-                        case "POST":
-                            restResponse = client.UploadString(serviceFullUrl, JsonHelper.SerializeToRestJson(data));
-                            break;
-                        case "GET":
-                            restResponse = client.DownloadString(serviceFullUrl);
-                            break;
-                        default:
-                            restResponse = client.UploadString(serviceFullUrl, httpMethod, JsonHelper.SerializeToRestJson(data));
-                            break;
-                    }
-
-                    return JsonHelper.DeserializeFromRestJson(restResponse, method.ReturnType);
+                    case "POST":
+                        restResponse = client.UploadString(serviceFullUrl, JsonHelper.SerializeToRestJson(data));
+                        break;
+                    case "GET":
+                        restResponse = client.DownloadString(serviceFullUrl);
+                        break;
+                    default:
+                        restResponse = client.UploadString(serviceFullUrl, httpMethod, JsonHelper.SerializeToRestJson(data));
+                        break;
                 }
+
+                return JsonHelper.DeserializeFromRestJson(restResponse, method.ReturnType);
             }
         }
         catch (Exception ex)

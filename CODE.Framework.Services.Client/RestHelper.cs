@@ -123,11 +123,11 @@ public static class RestHelper
     /// <param name="httpMethod">The HTTP method.</param>
     /// <returns>System.String.</returns>
     /// <remarks>This is used for REST GET operations</remarks>
-    public static string SerializeToUrlParameters(object objectToSerialize, string httpMethod = "GET")
+    public static string SerializeToUrlParameters(object objectToSerialize, string httpMethod)
     {
         var typeToSerialize = objectToSerialize.GetType();
-        var inlineParameterProperties = GetOrderedInlinePropertyList(typeToSerialize);
-        var namedParameterProperties = GetNamedPropertyList(typeToSerialize);
+        var inlineParameterProperties = GetOrderedInlinePropertyList(typeToSerialize); // Specifically configured inline parameters will be used for any verb
+        var namedParameterProperties = httpMethod.ToUpper() == "GET" ? GetNamedPropertyList(typeToSerialize) : new List<PropertyInfo>(); // We can't use URL parameters for anything other than GET, because we would break lots of existing code
 
         var sb = new StringBuilder();
         foreach (var inlineProperty in inlineParameterProperties)
