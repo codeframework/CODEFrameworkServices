@@ -14,6 +14,9 @@ public class PingResponse : BaseServiceResponse
 
     [DataMember(IsRequired = true)]
     public string FrameworkDescription { get; set; } = string.Empty;
+
+    [DataMember(IsRequired = false)]
+    public string CodeFrameworkVersion { get; set; } = string.Empty;
 }
 
 [DataContract]

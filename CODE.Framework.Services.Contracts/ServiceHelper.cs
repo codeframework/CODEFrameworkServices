@@ -18,7 +18,8 @@ public static class ServiceHelper
                 Version = referenceObject?.GetType().Assembly?.GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion,
                 OperatingSystemDescription = RuntimeInformation.OSDescription,
                 FrameworkDescription = RuntimeInformation.FrameworkDescription,
-                Success = true
+                Success = true,
+                CodeFrameworkVersion = typeof(ServiceHelper).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>().InformationalVersion
             };
         }
         catch
