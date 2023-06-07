@@ -238,13 +238,16 @@ public static class ServiceHandlerExtensions
     {
         if (SwaggerRoutes == null)
         {
-            SwaggerRoutes = new List<string>();
-            SwaggerRoutes.Add("/swagger"); // We assume swagger API is used when OpenAPI features are on. This makes sure that the general handler does not eat up other service routes
-            SwaggerRoutes.Add("/swagger/index.html");
+            SwaggerRoutes = new List<string>
+            {
+                "/swagger", // We assume swagger API is used when OpenAPI features are on. This makes sure that the general handler does not eat up other service routes
+                "/swagger/index.html"
+            };
         }
 
         var serviceConfig = ServiceHandlerConfiguration.Current;
-        if (serviceConfig == null) throw new Exception("CODE Framework hosted services must be configured before UseOpenApiHandler() can be called. Use AddHostedServices() to configure which services are to be present in the hosting environment.");
+        if (serviceConfig == null) 
+            throw new Exception("CODE Framework hosted services must be configured before UseOpenApiHandler() can be called. Use AddHostedServices() to configure which services are to be present in the hosting environment.");
 
         // Endpoints require routing, so we make sure it is there
         appBuilder.UseRouting();
@@ -340,7 +343,7 @@ public static class ServiceHandlerExtensions
                         if (!string.IsNullOrEmpty(obsoleteAttribute.Message))
                             obsoleteReason = obsoleteAttribute.Message.Trim();
                     }
-                    OpenApiHelper.AddTypeToComponents(openApiInfo, interfaceMethod.ReturnType, obsolete, obsoleteReason, xmlDocumentationFiles);
+                    OpenApiHelper.AddTypeToComponents(openApiInfo, interfaceMethod.ReturnType, obsolete, obsoleteReason, xmlDocumentationFiles, serviceInstanceConfig.JsonFormatMode);
                     pathInfo.Obsolete = obsolete;
                     pathInfo.ObsoleteReason = obsoleteReason;
                 }
@@ -362,7 +365,7 @@ public static class ServiceHandlerExtensions
                             if (!string.IsNullOrEmpty(obsoleteAttribute2.Message))
                                 obsoleteReason2 = obsoleteAttribute2.Message.Trim();
                         }
-                        OpenApiHelper.AddTypeToComponents(openApiInfo, parameter.ParameterType, obsolete2, obsoleteReason2, xmlDocumentationFiles);
+                        OpenApiHelper.AddTypeToComponents(openApiInfo, parameter.ParameterType, obsolete2, obsoleteReason2, xmlDocumentationFiles, serviceInstanceConfig.JsonFormatMode);
                     }
                     OpenApiHelper.ExtractOpenApiParameters(interfaceMethod, pathInfo, xmlDocumentationFiles);
                     if (methodParameters.Length > 0)

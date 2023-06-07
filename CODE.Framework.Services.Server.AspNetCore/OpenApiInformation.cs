@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using CODE.Framework.Services.Server.AspNetCore.Configuration;
+using System.Threading.Tasks;
 using System.Xml;
 using DescriptionAttribute = CODE.Framework.Services.Contracts.DescriptionAttribute;
 
@@ -67,9 +68,10 @@ public class OpenApiPathInfo
 
 public class OpenApiSchemaDefinition
 {
-    public OpenApiSchemaDefinition(Type type)
+    public OpenApiSchemaDefinition(Type type, JsonFormatModes jsonFormatMode)
     {
         Type = type;
+        JsonFormatMode = jsonFormatMode;
     }
 
     public string Name { get; set; }
@@ -77,7 +79,8 @@ public class OpenApiSchemaDefinition
     public Dictionary<string, OpenApiPropertyDefinition> Properties { get; } = new Dictionary<string, OpenApiPropertyDefinition>();
     public bool Obsolete { get; set; }
     public string ObsoleteReason { get; set; }
-    public Type Type { get; private set; }
+    public Type Type { get; }
+    public JsonFormatModes JsonFormatMode { get; }
 }
 
 public class OpenApiPropertyDefinition
@@ -200,13 +203,18 @@ public class ComponentsJsonConverter : JsonConverter<Dictionary<string, OpenApiS
             foreach (var propertyName in value[definitionName].Properties.Keys)
             {
                 var prop = value[definitionName].Properties[propertyName];
-                writer.WriteStartObject(propertyName);
+                var propertyPublicName = propertyName;
+                if (value[definitionName].JsonFormatMode == JsonFormatModes.CamelCase)
+                    propertyPublicName = StringHelper.CamelCase(propertyPublicName);
+                else if (value[definitionName].JsonFormatMode == JsonFormatModes.SnakeCase)
+                    propertyPublicName = StringHelper.SnakeCase(propertyPublicName);
+                writer.WriteStartObject(propertyPublicName);
                 WritePropertyTypeInformation(prop.Type, writer, prop.PropertyInfo, prop.Description, prop.Obsolete, prop.ObsoleteReason, typeInstance);
                 writer.WriteEndObject();
             }
 
             writer.WriteEndObject(); // properties
-            writer.WriteEndObject(); // componens object
+            writer.WriteEndObject(); // components object
         }
         writer.WriteEndObject(); // schemas
         writer.WriteEndObject();
@@ -589,6 +597,8 @@ public class PathJsonConverter : JsonConverter<Dictionary<string, OpenApiPathInf
             else
                 parameterDescription += $" Enum values: {enumDescription}";
         }
+        WriteDefaultValue(writer, parameter);
+
         if (!string.IsNullOrEmpty(parameterDescription))
         {
             writer.WritePropertyName("description");
@@ -596,6 +606,82 @@ public class PathJsonConverter : JsonConverter<Dictionary<string, OpenApiPathInf
         }
 
         writer.WriteEndObject();
+    }
+
+    private static void WriteDefaultValue(Utf8JsonWriter writer, OpenApiNamedOperationParameter parameter)
+    {
+        if (parameter.ParentObject == null) return;
+
+        object defaultValue = null;
+        try
+        {
+            defaultValue = parameter.PropertyInfo.GetValue(parameter.ParentObject);
+        }
+        catch
+        {
+            defaultValue = null;
+        }
+        if (defaultValue != null)
+        {
+            if (parameter.Type.IsEnum)
+            {
+                writer.WritePropertyName("default");
+                writer.WriteNumberValue((int)defaultValue);
+            }
+            else if (parameter.Type == typeof(string) || parameter.Type == typeof(char))
+            {
+                var defaultString = defaultValue.ToString();
+                if (!string.IsNullOrEmpty(defaultString))
+                {
+                    writer.WritePropertyName("default");
+                    writer.WriteStringValue(defaultString);
+                }
+            }
+            else if (parameter.Type == typeof(Guid))
+            {
+                writer.WritePropertyName("default");
+                writer.WriteStringValue(((Guid)defaultValue).ToString());
+            }
+            else if (parameter.Type == typeof(int))
+            {
+                writer.WritePropertyName("default");
+                writer.WriteNumberValue((int)defaultValue);
+            }
+            else if (parameter.Type == typeof(short))
+            {
+                writer.WritePropertyName("default");
+                writer.WriteNumberValue((short)defaultValue);
+            }
+            else if (parameter.Type == typeof(long))
+            {
+                writer.WritePropertyName("default");
+                writer.WriteNumberValue((long)defaultValue);
+            }
+            else if (parameter.Type == typeof(decimal))
+            {
+                writer.WritePropertyName("default");
+                writer.WriteNumberValue((decimal)defaultValue);
+            }
+            else if (parameter.Type == typeof(double))
+            {
+                writer.WritePropertyName("default");
+                writer.WriteNumberValue((double)defaultValue);
+            }
+            else if (parameter.Type == typeof(DateTime))
+            {
+                var defaultDateTime = (DateTime)defaultValue;
+                if (defaultDateTime != DateTime.MinValue && defaultDateTime != DateTime.MaxValue)
+                {
+                    writer.WritePropertyName("default");
+                    writer.WriteStringValue((DateTime)defaultValue); // TODO: This is probably not right in terms of the format
+                }
+            }
+            else if (parameter.Type == typeof(bool))
+            {
+                writer.WritePropertyName("default");
+                writer.WriteBooleanValue((bool)defaultValue);
+            }
+        }
     }
 }
 
@@ -620,20 +706,21 @@ public static class OpenApiHelper
         writer.WriteStringValue($"#/components/schemas/{type.FullName}");
     }
 
-    public static OpenApiSchemaDefinition GetTypeDefinition(Type type, bool obsolete, string obsoleteReason, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles)
+    public static OpenApiSchemaDefinition GetTypeDefinition(Type type, bool obsolete, string obsoleteReason, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles, JsonFormatModes jsonFormatMode)
     {
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>))
         {
             var taskType = type.GetGenericArguments()[0];
-            return GetTypeDefinition(taskType, obsolete, obsoleteReason, xmlDocumentationFiles);
+            return GetTypeDefinition(taskType, obsolete, obsoleteReason, xmlDocumentationFiles, jsonFormatMode);
         }
-        
-        var schema = new OpenApiSchemaDefinition(type);
 
-        schema.Name = type.FullName;
-        schema.Obsolete = obsolete;
-        schema.ObsoleteReason = obsoleteReason;
-        schema.Description = GetSummary(type, xmlDocumentationFiles);
+        var schema = new OpenApiSchemaDefinition(type, jsonFormatMode)
+        {
+            Name = type.FullName,
+            Obsolete = obsolete,
+            ObsoleteReason = obsoleteReason,
+            Description = GetSummary(type, xmlDocumentationFiles)
+        };
         if (string.IsNullOrEmpty(schema.Description))
             schema.Description = GetDescription(type, xmlDocumentationFiles);
 
@@ -668,9 +755,9 @@ public static class OpenApiHelper
         return schema;
     }
 
-    public static void AddTypeToComponents(OpenApiInformation openApiInfo, Type type, bool obsolete, string obsoleteReason, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles)
+    public static void AddTypeToComponents(OpenApiInformation openApiInfo, Type type, bool obsolete, string obsoleteReason, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles, JsonFormatModes jsonFormatMode)
     {
-        var typeDefinition = GetTypeDefinition(type, obsolete, obsoleteReason, xmlDocumentationFiles);
+        var typeDefinition = GetTypeDefinition(type, obsolete, obsoleteReason, xmlDocumentationFiles, jsonFormatMode);
         if (openApiInfo.Components.ContainsKey(typeDefinition.Name)) return;
 
         openApiInfo.Components.Add(typeDefinition.Name, typeDefinition);
@@ -680,19 +767,19 @@ public static class OpenApiHelper
             if (property.Type.IsArray)
             {
                 if (!(property.Type.FullName.StartsWith("System.") && property.Type.FullName.Split('.').Length == 2))
-                    AddTypeToComponents(openApiInfo, property.Type.GetElementType(), property.Obsolete, property.ObsoleteReason, xmlDocumentationFiles);
+                    AddTypeToComponents(openApiInfo, property.Type.GetElementType(), property.Obsolete, property.ObsoleteReason, xmlDocumentationFiles, jsonFormatMode);
             }
             else if (property.Type.Name == "List`1")
             {
                 if (property.Type.GenericTypeArguments.Length > 0)
                     if (string.IsNullOrEmpty(GetOpenApiType(property.Type.GenericTypeArguments[0]))) // We don't want simple types like string... so anything that is a known OpenApi type can be ignored here
-                        AddTypeToComponents(openApiInfo, property.Type.GenericTypeArguments[0], property.Obsolete, property.ObsoleteReason, xmlDocumentationFiles);
+                        AddTypeToComponents(openApiInfo, property.Type.GenericTypeArguments[0], property.Obsolete, property.ObsoleteReason, xmlDocumentationFiles, jsonFormatMode);
             }
             else if (property.Type.IsGenericType && property.Type.GetGenericTypeDefinition() == typeof(Nullable<>))
                 // Nullable types are likely just masqueraded simple types, so we can skip this one after all
                 continue;
             else
-                AddTypeToComponents(openApiInfo, property.Type, property.Obsolete, property.ObsoleteReason, xmlDocumentationFiles);
+                AddTypeToComponents(openApiInfo, property.Type, property.Obsolete, property.ObsoleteReason, xmlDocumentationFiles, jsonFormatMode);
         }
     }
 
@@ -703,6 +790,8 @@ public static class OpenApiHelper
         {
             var parameter = methodParameters[0]; // Note that in CODE Framework, there always is just a single in-parameter
             var parameterProperties = parameter.ParameterType.GetProperties();
+            var parameterObjectInstance = ObjectHelper.CreateInstanceFromType(parameter.ParameterType);
+
             foreach (var parameterProperty in parameterProperties)
             {
                 var description = GetDescription(parameterProperty, xmlDocumentationFiles);
@@ -711,14 +800,31 @@ public static class OpenApiHelper
                 if (restUrlParameterAttribute == null && isGet) restUrlParameterAttribute = new RestUrlParameterAttribute(); // Getting the defaults
                 if (restUrlParameterAttribute != null)
                     if (restUrlParameterAttribute.Mode == UrlParameterMode.Inline)
-                        pathInfo.PositionalParameters.Add(new OpenApiPositionalOperationParameter { Name = parameterProperty.Name, Type = parameterProperty.PropertyType, PositionIndex = restUrlParameterAttribute.Sequence, Description = description });
+                        pathInfo.PositionalParameters.Add(new OpenApiPositionalOperationParameter
+                        {
+                            Name = parameterProperty.Name,
+                            Type = parameterProperty.PropertyType,
+                            PositionIndex = restUrlParameterAttribute.Sequence,
+                            Description = description,
+                            ParentObject = parameterObjectInstance,
+                            PropertyInfo = parameterProperty
+                        });
                     else
                     {
                         var isRequired = false;
                         var dataMemberAttribute = parameterProperty.GetCustomAttributeEx<DataMemberAttribute>();
                         if (dataMemberAttribute != null)
                             isRequired = dataMemberAttribute.IsRequired;
-                        pathInfo.NamedParameters.Add(new OpenApiNamedOperationParameter { Name = parameterProperty.Name, Type = parameterProperty.PropertyType, Required = isRequired, Description = description });
+
+                        pathInfo.NamedParameters.Add(new OpenApiNamedOperationParameter
+                        {
+                            Name = parameterProperty.Name,
+                            Type = parameterProperty.PropertyType,
+                            Required = isRequired,
+                            Description = description,
+                            ParentObject = parameterObjectInstance,
+                            PropertyInfo = parameterProperty
+                        });
                     }
 
             }
@@ -993,6 +1099,8 @@ public class OpenApiNamedOperationParameter : IOpenApiOperationParameter
     public string Description { get; set; }
     public Type Type { get; set; }
     public bool Required { get; set; } = false;
+    public object ParentObject { get; set; }
+    public PropertyInfo PropertyInfo { get; set; }
 }
 
 public class OpenApiPositionalOperationParameter : OpenApiNamedOperationParameter

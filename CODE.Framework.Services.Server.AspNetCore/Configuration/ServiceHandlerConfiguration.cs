@@ -93,6 +93,7 @@ public enum JsonFormatModes
 {
     CamelCase,
     ProperCase,
+    [Obsolete("snake_case is not currently supported")]
     SnakeCase
 }
 

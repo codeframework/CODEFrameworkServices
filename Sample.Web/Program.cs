@@ -29,7 +29,7 @@ builder.Services.AddHostedServices(config =>
         },
         new ServiceHandlerConfigurationInstance
         {
-            ServiceTypeName = "Sample.Services.Implementation.CustomerService", // dynamically loaded type by specifying the name in a tring
+            ServiceTypeName = "Sample.Services.Implementation.CustomerService", // dynamically loaded type by specifying the name in a string
             AssemblyName = "Sample.Services.Implementation", // framework needs to load assembly
             RouteBasePath = "/api/customers",
             JsonFormatMode = JsonFormatModes.ProperCase, // proper-case formats JSON like FirstName
@@ -40,7 +40,7 @@ builder.Services.AddHostedServices(config =>
                 {
                     new Claim("Permission", "CanViewPage"),
                     new Claim(ClaimTypes.Role, "Administrators"),
-                    new Claim(ClaimTypes.NameIdentifier, "Rick S. Cust")
+                    new Claim(ClaimTypes.NameIdentifier, "Markus E. Customer")
                 }, "Basic"));
 
                 return Task.FromResult(true);

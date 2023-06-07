@@ -177,6 +177,36 @@ namespace CODE.Framework.Fundamentals.Utilities
             return sb.ToString();
         }
 
+        public static string SnakeCase(string originalString)
+        {
+            var chars = originalString.Trim().ToCharArray();
+            var sb = new StringBuilder();
+            for (var counter = 0; counter < chars.Length; counter++)
+            {
+                var dummy = chars[counter].ToString();
+                if (counter > 0)
+                    if (dummy.ToUpper(CultureInfo.InvariantCulture) == dummy)
+                        sb.Append("_");
+                sb.Append(dummy.ToLower());
+            }
+            return sb.ToString();
+        }
+
+        public static string CamelCase(string originalString)
+        {
+            var chars = originalString.Trim().ToCharArray();
+            var sb = new StringBuilder();
+            for (var counter = 0; counter < chars.Length; counter++)
+            {
+                var dummy = chars[counter].ToString();
+                if (counter == 0)
+                    sb.Append(dummy.ToLower());
+                else
+                    sb.Append(dummy);
+            }
+            return sb.ToString();
+        }
+
         /// <summary>Receives a string and a file name as parameters and writes the contents of the string to that file</summary>
         /// <example>
         /// string text = "This is the line we want to insert in our file.";

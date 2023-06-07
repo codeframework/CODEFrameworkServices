@@ -180,7 +180,7 @@ public class GetCustomerRequest : BaseServiceRequest
     /// Customer ID (free-form string value)
     /// </summary>
     [DataMember, RestUrlParameter(Mode = UrlParameterMode.Inline)]
-    public string Id { get; set; }
+    public string Id { get; set; } = "Test";
 }
 
 [DataContract]
