@@ -118,7 +118,7 @@ namespace CODE.Framework.Fundamentals.Utilities
                 var proxyTypeInfo = typeBuilder.CreateTypeInfo();
                 var proxyType2 = proxyTypeInfo.AsType();
                 var proxy = Activator.CreateInstance(proxyType2, new object[] { handler }, null);
-                if (useProxyCache) ProxyCache.Add(proxyType2, proxy);
+                if (useProxyCache) ProxyCache.Add(proxyType, proxy);
                 return proxy;
             }
         }

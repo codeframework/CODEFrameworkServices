@@ -2,13 +2,13 @@
 
 	<PropertyGroup>
 		<TargetFramework>net6.0</TargetFramework>
-    <AssemblyVersion>2.0.15.0</AssemblyVersion>
-    <FileVersion>2.0.15.0</FileVersion>
-    <Version>2.0.15</Version>
+    <AssemblyVersion>2.0.16.0</AssemblyVersion>
+    <FileVersion>2.0.16.0</FileVersion>
+    <Version>2.0.16</Version>
     <Authors>Markus Egger Inc.</Authors>
 		<Company>Markus Egger Inc.</Company>
 		<Product>CODE Framework</Product>
-		<Copyright>Markus Egger Inc., 2017-2022</Copyright>
+		<Copyright>Markus Egger Inc., 2017-2023</Copyright>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<Description>ASP.NET Core specific service implementation for CODE Framework.</Description>
 		<PackageProjectUrl>https://codeframework.io</PackageProjectUrl>

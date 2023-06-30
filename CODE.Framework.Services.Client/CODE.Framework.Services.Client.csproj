@@ -3,9 +3,9 @@
 	<PropertyGroup>
 		<TargetFrameworks>netstandard2.0</TargetFrameworks>
 		<LangVersion>Latest</LangVersion>
-    <AssemblyVersion>2.0.15.0</AssemblyVersion>
-    <FileVersion>2.0.15.0</FileVersion>
-    <Version>2.0.15</Version>
+    <AssemblyVersion>2.0.16.0</AssemblyVersion>
+    <FileVersion>2.0.16.0</FileVersion>
+    <Version>2.0.16</Version>
     <Authors>Markus Egger Inc.</Authors>
 		<Company>Markus Egger Inc.</Company>
 		<Product>CODE Framework</Product>
@@ -13,8 +13,8 @@
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<RepositoryUrl>https://github.com/MarkusEggerInc/CODEFrameworkCore</RepositoryUrl>
 		<RepositoryType>Git</RepositoryType>
-		<Copyright>Markus Egger Inc., 2017-2022</Copyright>
-		<Description>Client-side components used for CODE Framework Service Features</Description>
+    <Copyright>Markus Egger Inc., 2017-2023</Copyright>
+    <Description>Client-side components used for CODE Framework Service Features</Description>
 		<PackageIconUrl>http://www.codemag.com/Images/Logos/CodeFramework_Small.png</PackageIconUrl>
 		<PackageIcon>CODEFrameworkLogoSmall.png</PackageIcon>
 		<PackageProjectUrl>https://codeframework.io</PackageProjectUrl>

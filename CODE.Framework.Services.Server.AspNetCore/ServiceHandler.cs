@@ -1,5 +1,6 @@
 ﻿using CODE.Framework.Services.Server.AspNetCore.Properties;
 using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Claims;
@@ -236,7 +237,12 @@ public class ServiceHandler
         if (HttpRequest.ContentLength == null || HttpRequest.ContentLength < 1)
             parameterData = ObjectHelper.CreateInstanceFromType(parameter.ParameterType); // if no content create an empty one
         else
-            parameterData = await JsonSerializer.DeserializeAsync(HttpRequest.Body, parameter.ParameterType);
+        {
+            var jsonOptions = new JsonSerializerOptions { AllowTrailingCommas = true, PropertyNameCaseInsensitive = true };
+            if (handlerContext.ServiceInstanceConfiguration.JsonFormatMode == JsonFormatModes.CamelCase)
+                jsonOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+            parameterData = await JsonSerializer.DeserializeAsync(HttpRequest.Body, parameter.ParameterType, jsonOptions);
+        }
 
         // We map all parameters passed as named parameters in the URL to their respective properties
         foreach (var key in handlerContext.HttpRequest.Query.Keys)
