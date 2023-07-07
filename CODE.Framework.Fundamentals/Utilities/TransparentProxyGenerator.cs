@@ -46,7 +46,11 @@ namespace CODE.Framework.Fundamentals.Utilities
         public static object GetProxy(Type proxyType, IProxyHandler handler, bool useProxyCache = true)
         {
             if (!proxyType.IsInterface) throw new ArgumentException("T needs to be an interface");
-            if (useProxyCache && ProxyCache.ContainsKey(proxyType)) return ProxyCache[proxyType];
+
+            if (useProxyCache)
+                lock (ProxyCache)
+                    if (ProxyCache.ContainsKey(proxyType))
+                        return ProxyCache[proxyType];
 
             lock (LockDummy)
             {
@@ -118,7 +122,16 @@ namespace CODE.Framework.Fundamentals.Utilities
                 var proxyTypeInfo = typeBuilder.CreateTypeInfo();
                 var proxyType2 = proxyTypeInfo.AsType();
                 var proxy = Activator.CreateInstance(proxyType2, new object[] { handler }, null);
-                if (useProxyCache) ProxyCache.Add(proxyType, proxy);
+                if (useProxyCache)
+                {
+                    lock (ProxyCache)
+                    {
+                        if (!ProxyCache.ContainsKey(proxyType))
+                            ProxyCache.Add(proxyType, proxy);
+                        else
+                            ProxyCache[proxyType] = proxy;
+                    }
+                }
                 return proxy;
             }
         }
@@ -150,8 +163,13 @@ namespace CODE.Framework.Fundamentals.Utilities
         public static TProxy GetProxy<TProxy>(IProxyHandler handler, bool useProxyCache = true)
         {
             var t = typeof(TProxy);
+
             if (!t.IsInterface) throw new ArgumentException("T needs to be an interface");
-            if (useProxyCache && ProxyCache.ContainsKey(t)) return (TProxy)ProxyCache[t];
+
+            if (useProxyCache)
+                lock (ProxyCache)
+                    if (ProxyCache.ContainsKey(t))
+                        return ProxyCache[t];
 
             lock (LockDummy)
             {
@@ -224,7 +242,16 @@ namespace CODE.Framework.Fundamentals.Utilities
                 }
                 var proxyType = typeBuilder.CreateType();
                 var proxy = Activator.CreateInstance(proxyType, new object[] { handler }, null);
-                if (useProxyCache) ProxyCache.Add(t, proxy);
+                if (useProxyCache)
+                {
+                    lock (ProxyCache)
+                    {
+                        if (!ProxyCache.ContainsKey(proxyType))
+                            ProxyCache.Add(proxyType, proxy);
+                        else
+                            ProxyCache[proxyType] = proxy;
+                    }
+                }
                 return (TProxy)proxy;
             }
         }

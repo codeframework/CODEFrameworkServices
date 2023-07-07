@@ -146,6 +146,22 @@ public static class ServiceClient
     }
 
     /// <summary>
+    /// Clears either an individual setting (if a setting name is provided as the parameter),
+    /// or all settings.
+    /// </summary>
+    /// <param name="setting">Setting to clear (if not provided, all settings are cleared).</param>
+    public static void ClearSettingsCache(string setting = null)
+    {
+        lock (SettingsCache)
+        {
+            if (string.IsNullOrEmpty(setting))
+                SettingsCache.Clear();
+            else if (SettingsCache.ContainsKey(setting))
+                SettingsCache.Remove(setting);
+        }
+    }
+
+    /// <summary>
     /// Gets the protocol for the specified service.
     /// </summary>
     /// <typeparam name="TServiceType">Type of the service (contract).</typeparam>
