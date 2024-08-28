@@ -158,6 +158,8 @@ public static class ServiceClient
                 SettingsCache.Clear();
             else if (SettingsCache.ContainsKey(setting))
                 SettingsCache.Remove(setting);
+
+            TransparentProxyGenerator.ClearProxyCache();
         }
     }
 

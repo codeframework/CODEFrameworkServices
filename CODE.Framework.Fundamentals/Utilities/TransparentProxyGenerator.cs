@@ -135,6 +135,22 @@ namespace CODE.Framework.Fundamentals.Utilities
                 return proxy;
             }
         }
+
+        /// <summary>
+        /// Clears either an individual proxy type (if a proxy type is provided as the parameter),
+        /// or all proxies.
+        /// </summary>
+        /// <param name="proxyType">Proxy Type to clear (if not provided, all proxies are cleared).</param>
+        public static void ClearProxyCache(Type proxyType = null)
+        {
+            lock (ProxyCache)
+            {
+                if (proxyType == null)
+                    ProxyCache.Clear();
+                else if (ProxyCache.ContainsKey(proxyType))
+                    ProxyCache.Remove(proxyType);
+            }
+        }
     }
 
 #endif
