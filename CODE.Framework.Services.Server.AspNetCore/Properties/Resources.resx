@@ -136,6 +136,6 @@
     <value>Couldn't create type instance: {0}</value>
   </data>
   <data name="UnableToExecuteMethod" xml:space="preserve">
-    <value>Unable to execute propertyInfo {0}: {1}</value>
+    <value>Unable to execute method {0}: {1}</value>
   </data>
 </root>

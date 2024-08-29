@@ -113,7 +113,9 @@ public class ServiceHandler
                 var ex2 = ex;
                 if (ex2 is InvalidOperationException && ex2.InnerException != null)
                     ex2 = ex2.InnerException;
-                context.ResultValue = ServiceHelper.GetPopulatedFailureResponse(context.MethodContext.MethodInfo.ReturnType, ex, context.MethodContext.MethodInfo.DeclaringType.Name, context.MethodContext.MethodInfo.Name);
+                else if (ex2 is TargetInvocationException && ex2.InnerException != null)
+                    ex2 = ex2.InnerException;
+                context.ResultValue = ServiceHelper.GetPopulatedFailureResponse(context.MethodContext.MethodInfo.ReturnType, ex2, context.MethodContext.MethodInfo.DeclaringType.Name, context.MethodContext.MethodInfo.Name);
             }
             else
             {
@@ -203,7 +205,9 @@ public class ServiceHandler
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException(string.Format(Resources.UnableToExecuteMethod, methodToInvoke.Name, ex.Message));
+            throw;
+            //throw new InvalidOperationException(string.Format(Resources.UnableToExecuteMethod, methodToInvoke.Name, ex));
+            //throw new InvalidOperationException(string.Format(Resources.UnableToExecuteMethod, methodToInvoke.Name, ex.Message));
         }
         finally
         {

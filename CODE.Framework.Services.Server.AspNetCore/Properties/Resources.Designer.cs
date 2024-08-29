@@ -115,7 +115,7 @@ namespace CODE.Framework.Services.Server.AspNetCore.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Unable to execute propertyInfo {0}: {1}.
+        ///   Looks up a localized string similar to Unable to execute method {0}: {1}.
         /// </summary>
         internal static string UnableToExecuteMethod {
             get {
