@@ -151,6 +151,10 @@ public class ServiceHandler
 #endif
 
                 var inputType = context.ResultValue.GetType();
+                //If the result is a Task<T>, we need to return the actual type T
+                var isTask = inputType.IsGenericType && inputType.GetGenericTypeDefinition() == typeof(Task<>);
+                if (isTask)
+                    inputType = inputType.GetGenericArguments()[0];
                 context.ResultJson = JsonSerializer.Serialize(context.ResultValue, inputType, options);
             }
 
