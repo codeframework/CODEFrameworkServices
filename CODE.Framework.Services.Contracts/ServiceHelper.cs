@@ -59,7 +59,8 @@ public static class ServiceHelper
 
         var response2 = Activator.CreateInstance(genericTypes[0]);
         var response3 = GetPopulatedFailureResponse(ex, response2, 2, typeName, methodName);
-        return Task.FromResult(response3);
+        return response3; 
+        //return Task.FromResult(response3); //Wrapping this in a Task results in a Task<T> being serialized and the caller receiving an invalid response
     }
 
     private static TResponse GetPopulatedFailureResponse<TResponse>(Exception ex, TResponse response, int stackDepth, string typeName = "", string methodName = "") where TResponse : new()
