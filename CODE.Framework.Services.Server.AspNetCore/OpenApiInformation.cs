@@ -1,4 +1,5 @@
 ﻿using CODE.Framework.Services.Server.AspNetCore.Configuration;
+using System.Diagnostics.Eventing.Reader;
 using System.Threading.Tasks;
 using System.Xml;
 using DescriptionAttribute = CODE.Framework.Services.Contracts.DescriptionAttribute;
@@ -480,9 +481,9 @@ public class PathJsonConverter : JsonConverter<Dictionary<string, OpenApiPathInf
 
                 writer.WriteStartArray("parameters");
                 foreach (var parameter in path.PositionalParameters.OrderBy(p => p.PositionIndex))
-                    WritePathParameters(writer, parameter);
+                    WritePathParameters(writer, parameter, false);
                 foreach (var parameter in path.NamedParameters)
-                    WritePathParameters(writer, parameter);
+                    WritePathParameters(writer, parameter, true);
                 writer.WriteEndArray();
 
                 if (path.Payload != null)
@@ -566,13 +567,13 @@ public class PathJsonConverter : JsonConverter<Dictionary<string, OpenApiPathInf
         writer.WriteEndObject();
     }
 
-    private static void WritePathParameters(Utf8JsonWriter writer, OpenApiNamedOperationParameter parameter)
+    private static void WritePathParameters(Utf8JsonWriter writer, OpenApiNamedOperationParameter parameter, bool isQuery)
     {
         writer.WriteStartObject();
         writer.WritePropertyName("name");
         writer.WriteStringValue(parameter.Name);
         writer.WritePropertyName("in");
-        writer.WriteStringValue("path");
+        writer.WriteStringValue(isQuery ? "query" : "path");
         writer.WritePropertyName("required");
         writer.WriteBooleanValue(parameter.Required);
         var parameterOpenApiType = OpenApiHelper.GetOpenApiType(parameter.Type);
