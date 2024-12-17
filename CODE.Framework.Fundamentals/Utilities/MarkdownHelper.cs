@@ -11,11 +11,11 @@ namespace CODE.Framework.Fundamentals.Utilities
                                     bool useCustomContainers = true, bool useEmojiAndSmiley = true, bool useEmphasisExtras = true, bool useFigures = true,
                                     bool useFootnotes = true, bool useGenericAttributes = false, bool useGridTables = true, bool useListExtras = true,
                                     bool useMediaLinks = true, bool usePipeTables = true, bool usePragmaLines = false, bool useSmartyPants = true,
-                                    bool useTaskLists = true, bool useYamlFrontMatter = true, bool useAutoLinks = true)
+                                    bool useTaskLists = true, bool useYamlFrontMatter = true, bool useAutoLinks = true, bool useSoftlineBreakAsHardlineBreak = true)
         {
             var pipeline = BuildPipeline(useAbbreviations, useAutoIdentifiers, useCitations, useCustomContainers, useEmojiAndSmiley, useEmphasisExtras, useFigures,
                                          useFootnotes, useGenericAttributes, useGridTables, useListExtras, useMediaLinks, usePipeTables, usePragmaLines,
-                                         useSmartyPants, useTaskLists, useYamlFrontMatter, useAutoLinks).Build();
+                                         useSmartyPants, useTaskLists, useYamlFrontMatter, useAutoLinks, useSoftlineBreakAsHardlineBreak).Build();
 
             var html = Markdown.ToHtml(markdown, pipeline);
 
@@ -49,7 +49,7 @@ namespace CODE.Framework.Fundamentals.Utilities
                                                              bool useEmojiAndSmiley, bool useEmphasisExtras, bool useFigures, bool useFootnotes,
                                                              bool useGenericAttributes, bool useGridTables, bool useListExtras, bool useMediaLinks,
                                                              bool usePipeTables, bool usePragmaLines, bool useSmartyPants, bool useTaskLists, 
-                                                             bool useYamlFrontMatter, bool useAutoLinks)
+                                                             bool useYamlFrontMatter, bool useAutoLinks, bool useSoftlineBreakAsHardlineBreak)
         {
             var builder = new MarkdownPipelineBuilder();
 
@@ -73,6 +73,8 @@ namespace CODE.Framework.Fundamentals.Utilities
             if (useYamlFrontMatter) builder = builder.UseYamlFrontMatter();
 
             if (useAutoLinks) builder = builder.UseAutoLinks();
+
+            if (useSoftlineBreakAsHardlineBreak) builder = builder.UseSoftlineBreakAsHardlineBreak();
 
             return builder;
         }
