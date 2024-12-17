@@ -1,11 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net6.0</TargetFramework>
-    <AssemblyVersion>2.0.17.0</AssemblyVersion>
-    <FileVersion>2.0.17.0</FileVersion>
-    <Version>2.0.17</Version>
-    <Authors>Markus Egger Inc.</Authors>
+		<TargetFramework>net8.0</TargetFramework>
+		<AssemblyVersion>2.0.18.0</AssemblyVersion>
+		<FileVersion>2.0.18.0</FileVersion>
+		<Version>2.0.18</Version>
+		<Authors>Markus Egger Inc.</Authors>
 		<Company>Markus Egger Inc.</Company>
 		<Product>CODE Framework</Product>
 		<Copyright>Markus Egger Inc., 2017-2023</Copyright>
