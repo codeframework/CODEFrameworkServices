@@ -50,8 +50,7 @@ namespace CODE.Framework.Fundamentals.Utilities
             foreach (var logger in Loggers)
                 if (logger.TypeFilter == LogEventType.Undefined || ((logger.TypeFilter & type) == type))
                 {
-                    var exceptionLogger = logger as IExceptionLogger;
-                    if (exceptionLogger != null)
+                    if (logger is IExceptionLogger exceptionLogger)
                         exceptionLogger.Log(exception, type);
                     else
                         logger.Log(exceptionText, type);

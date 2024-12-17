@@ -36,7 +36,7 @@
   </ItemGroup>-->
 
 	<ItemGroup>
-		<PackageReference Include="System.ServiceModel.Primitives" Version="4.9.0" />
+		<PackageReference Include="System.ServiceModel.Primitives" Version="8.1.1" />
 	</ItemGroup>
 	<!--<PropertyGroup Condition=" '$(TargetFramework)' == 'net45'">
     <DefineConstants>NET45;NETFULL</DefineConstants>
