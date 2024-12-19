@@ -16,9 +16,9 @@
 		<PackageIcon>CODEFrameworkLogoSmall.png</PackageIcon>
 		<PackageProjectUrl>https://codeframework.io</PackageProjectUrl>
 		<AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
-		<AssemblyVersion>2.0.18.0</AssemblyVersion>
-		<FileVersion>2.0.18.0</FileVersion>
-		<Version>2.0.18</Version>
+		<AssemblyVersion>2.0.19.0</AssemblyVersion>
+		<FileVersion>2.0.19.0</FileVersion>
+		<Version>2.0.19</Version>
 	</PropertyGroup>
 
 	<ItemGroup>

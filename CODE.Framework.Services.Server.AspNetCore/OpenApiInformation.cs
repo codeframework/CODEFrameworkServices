@@ -1,6 +1,4 @@
-﻿using CODE.Framework.Services.Server.AspNetCore.Configuration;
-using System.Diagnostics.Eventing.Reader;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using System.Xml;
 using DescriptionAttribute = CODE.Framework.Services.Contracts.DescriptionAttribute;
 
@@ -12,14 +10,14 @@ public class OpenApiInformation
     public OpenApiInfo Info { get; set; } = new OpenApiInfo();
 
     [JsonConverter(typeof(PathJsonConverter))]
-    public Dictionary<string, OpenApiPathInfo> Paths { get; set; } = new Dictionary<string, OpenApiPathInfo>();
+    public Dictionary<string, OpenApiPathInfo> Paths { get; set; } = [];
 
     public string BasePath { get; set; } = "/";
     public string Host { get; set; } = "localhost";
-    public List<OpenApiTag> Tags { get; set; } = new List<OpenApiTag>();
+    public List<OpenApiTag> Tags { get; set; } = [];
 
     [JsonConverter(typeof(ComponentsJsonConverter))]
-    public Dictionary<string, OpenApiSchemaDefinition> Components { get; set; } = new Dictionary<string, OpenApiSchemaDefinition>();
+    public Dictionary<string, OpenApiSchemaDefinition> Components { get; set; } = [];
 }
 
 public class OpenApiInfo
@@ -35,7 +33,7 @@ public class OpenApiInfo
 public class OpenApiPathInfo
 {
     private readonly string _path;
-    private readonly Dictionary<string, OpenApiVerb> _verbs = new Dictionary<string, OpenApiVerb>();
+    private readonly Dictionary<string, OpenApiVerb> _verbs = [];
 
     public OpenApiPathInfo(string path, string verb = "post", string operationId = "", MethodInfo method = null)
     {
@@ -49,13 +47,13 @@ public class OpenApiPathInfo
 
     public override string ToString() => _path;
 
-    public List<OpenApiTag> Tags { get; set; } = new List<OpenApiTag>();
+    public List<OpenApiTag> Tags { get; set; } = [];
 
-    public Dictionary<string, OpenApiSchemaDefinition> Definitions { get; set; } = new Dictionary<string, OpenApiSchemaDefinition>();
+    public Dictionary<string, OpenApiSchemaDefinition> Definitions { get; set; } = [];
 
-    public List<OpenApiNamedOperationParameter> NamedParameters { get; } = new List<OpenApiNamedOperationParameter>();
+    public List<OpenApiNamedOperationParameter> NamedParameters { get; } = [];
 
-    public List<OpenApiPositionalOperationParameter> PositionalParameters { get; } = new List<OpenApiPositionalOperationParameter>();
+    public List<OpenApiPositionalOperationParameter> PositionalParameters { get; } = [];
     
     public OpenApiPayload Payload { get; set; }
 
@@ -77,7 +75,7 @@ public class OpenApiSchemaDefinition
 
     public string Name { get; set; }
     public string Description { get; set; }
-    public Dictionary<string, OpenApiPropertyDefinition> Properties { get; } = new Dictionary<string, OpenApiPropertyDefinition>();
+    public Dictionary<string, OpenApiPropertyDefinition> Properties { get; } = [];
     public bool Obsolete { get; set; }
     public string ObsoleteReason { get; set; }
     public Type Type { get; }
@@ -402,17 +400,18 @@ public class PathJsonConverter : JsonConverter<Dictionary<string, OpenApiPathInf
         foreach (var positionalParameter in positionalParameters.OrderBy(p => p.PositionIndex))
             route += $"/{{{positionalParameter.Name}}}";
 
-        if (namedParameters.Count > 0)
-        {
-            route += "?";
-            for (int parameterCounter = 0; parameterCounter < namedParameters.Count; parameterCounter++)
-            {
-                var namedParameter = namedParameters[parameterCounter];
-                route += $"{namedParameter.Name}={{{namedParameter.Name}}}";
-                if (parameterCounter < namedParameters.Count - 1)
-                    route += "&";
-            }
-        }
+        // In the latest Swagger UI version, including the query parameters in the URL pattern is not supported anymore
+        //if (namedParameters.Count > 0)
+        //{
+        //    route += "?";
+        //    for (int parameterCounter = 0; parameterCounter < namedParameters.Count; parameterCounter++)
+        //    {
+        //        var namedParameter = namedParameters[parameterCounter];
+        //        route += $"{namedParameter.Name}={{{namedParameter.Name}}}";
+        //        if (parameterCounter < namedParameters.Count - 1)
+        //            route += "&";
+        //    }
+        //}
 
         return route;
     }
@@ -575,7 +574,7 @@ public class PathJsonConverter : JsonConverter<Dictionary<string, OpenApiPathInf
         writer.WritePropertyName("in");
         writer.WriteStringValue(isQuery ? "query" : "path");
         writer.WritePropertyName("required");
-        writer.WriteBooleanValue(parameter.Required);
+        writer.WriteBooleanValue(!isQuery || parameter.Required);
         var parameterOpenApiType = OpenApiHelper.GetOpenApiType(parameter.Type);
         if (!string.IsNullOrEmpty(parameterOpenApiType))
         {
