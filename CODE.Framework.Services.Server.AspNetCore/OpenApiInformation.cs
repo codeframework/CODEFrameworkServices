@@ -578,6 +578,8 @@ public class PathJsonConverter : JsonConverter<Dictionary<string, OpenApiPathInf
         var parameterOpenApiType = OpenApiHelper.GetOpenApiType(parameter.Type);
         if (!string.IsNullOrEmpty(parameterOpenApiType))
         {
+            writer.WritePropertyName("schema");
+            writer.WriteStartObject();
             writer.WritePropertyName("type");
             writer.WriteStringValue(parameterOpenApiType);
             var parameterOpenApiTypeFormat = OpenApiHelper.GetOpenApiTypeFormat(parameter.Type);
@@ -586,6 +588,8 @@ public class PathJsonConverter : JsonConverter<Dictionary<string, OpenApiPathInf
                 writer.WritePropertyName("format");
                 writer.WriteStringValue(parameterOpenApiTypeFormat);
             }
+            WriteDefaultValue(writer, parameter);
+            writer.WriteEndObject();
         }
 
         var parameterDescription = parameter.Description;
@@ -597,7 +601,6 @@ public class PathJsonConverter : JsonConverter<Dictionary<string, OpenApiPathInf
             else
                 parameterDescription += $" Enum values: {enumDescription}";
         }
-        WriteDefaultValue(writer, parameter);
 
         if (!string.IsNullOrEmpty(parameterDescription))
         {
