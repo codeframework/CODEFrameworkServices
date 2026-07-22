@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-
-namespace CODE.Framework.Fundamentals.Configuration
+﻿namespace CODE.Framework.Fundamentals.Configuration
 {
     public class DictionarySettings : ConfigurationSource
     {

@@ -18,7 +18,12 @@
 		<PackageIconUrl>http://www.codemag.com/Images/Logos/CodeFramework_Small.png</PackageIconUrl>
 		<PackageIcon>CODEFrameworkLogoSmall.png</PackageIcon>
 		<PackageProjectUrl>https://codeframework.io</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
 	<ItemGroup>
 		<None Include="CODEFrameworkLogoSmall.png" Pack="true" PackagePath="\" />
@@ -28,19 +33,9 @@
 		<DefineConstants>DEBUG;NETCORE;NETSTANDARD</DefineConstants>
 	</PropertyGroup>
 
-	<!--<ItemGroup Condition=" '$(TargetFramework)' == 'net45' ">
-    <Reference Include="mscorlib" />
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="Microsoft.CSharp" />
-  </ItemGroup>-->
-
 	<ItemGroup>
-		<PackageReference Include="System.ServiceModel.Primitives" Version="8.1.2" />
+		<PackageReference Include="System.ServiceModel.Primitives" Version="10.0.652802" />
 	</ItemGroup>
-	<!--<PropertyGroup Condition=" '$(TargetFramework)' == 'net45'">
-    <DefineConstants>NET45;NETFULL</DefineConstants>
-  </PropertyGroup>-->
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|netstandard2.0|AnyCPU'">
 		<Optimize>false</Optimize>
 	</PropertyGroup>

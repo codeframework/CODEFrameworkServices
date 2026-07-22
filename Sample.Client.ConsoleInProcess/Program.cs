@@ -83,13 +83,17 @@ ServiceClient.Call<ICustomerService>(c =>
     try
     {
         Console.WriteLine("Calling service....");
+#pragma warning disable CS0618 // Type or member is obsolete - for test purpose.
         var response = c.DateTest(new DateTestRequest { FirstDate = DateTime.Now, SecondDate = DateTime.Now.AddYears(1) });
+#pragma warning restore CS0618 // Type or member is obsolete
         if (response.Success)
         {
             Console.ForegroundColor = ConsoleColor.DarkGreen;
             Console.WriteLine("Search Test Result:");
             Console.WriteLine($"First date returned: {response.FirstDateReturned}");
+#pragma warning disable CS0618 // Type or member is obsolete - for test purpose.
             Console.WriteLine($"Second date returned: {response.SecondDateReturned}");
+#pragma warning restore CS0618 // Type or member is obsolete
         }
         else
         {

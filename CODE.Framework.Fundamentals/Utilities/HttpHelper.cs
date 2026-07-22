@@ -1,7 +1,4 @@
-﻿using System;
-using System.Text;
-
-namespace CODE.Framework.Fundamentals.Utilities
+﻿namespace CODE.Framework.Fundamentals.Utilities
 {
     /// <summary>
     /// This class provides useful methods for dealing with HTTP

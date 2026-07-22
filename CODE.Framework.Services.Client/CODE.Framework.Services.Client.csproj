@@ -19,7 +19,12 @@
 		<PackageIcon>CODEFrameworkLogoSmall.png</PackageIcon>
 		<PackageProjectUrl>https://codeframework.io</PackageProjectUrl>
 		<AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
 	<ItemGroup>
 		<None Include="CODEFrameworkLogoSmall.png" Pack="true" PackagePath="\" />
@@ -39,8 +44,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.10" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.10" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
 	</ItemGroup>
 
 </Project>

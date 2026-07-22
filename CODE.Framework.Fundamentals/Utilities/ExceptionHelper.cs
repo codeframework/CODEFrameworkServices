@@ -1,6 +1,4 @@
 ﻿using CODE.Framework.Fundamentals.Properties;
-using System;
-using System.Text;
 
 namespace CODE.Framework.Fundamentals.Utilities
 {
