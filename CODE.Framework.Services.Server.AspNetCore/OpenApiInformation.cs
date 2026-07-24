@@ -205,8 +205,10 @@ public class ComponentsJsonConverter : JsonConverter<Dictionary<string, OpenApiS
                 var propertyPublicName = propertyName;
                 if (value[definitionName].JsonFormatMode == JsonFormatModes.CamelCase)
                     propertyPublicName = StringHelper.CamelCase(propertyPublicName);
+#pragma warning disable CS0618 // Type or member is obsolete
                 else if (value[definitionName].JsonFormatMode == JsonFormatModes.SnakeCase)
                     propertyPublicName = StringHelper.SnakeCase(propertyPublicName);
+#pragma warning restore CS0618
                 writer.WriteStartObject(propertyPublicName);
                 WritePropertyTypeInformation(prop.Type, writer, prop.PropertyInfo, prop.Description, prop.Obsolete, prop.ObsoleteReason, typeInstance);
                 writer.WriteEndObject();

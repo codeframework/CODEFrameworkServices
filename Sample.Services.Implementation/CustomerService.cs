@@ -8,11 +8,13 @@ public class CustomerService : ICustomerService, IServiceEvents
 {
     public PingResponse Ping(PingRequest request) => this.GetPopulatedPingResponse();
 
-    public DateTestResponse DateTest(DateTestRequest request) => new DateTestResponse
+#pragma warning disable CS0618 // Type or member is obsolete
+    public DateTestResponse DateTest(DateTestRequest request) => new()
     {
         FirstDateReturned = request.FirstDate,
         SecondDateReturned = request.SecondDate
     };
+#pragma warning restore CS0618 // Type or member is obsolete
 
     public GetCustomersResponse GetCustomers(GetCustomersRequest request)
     {

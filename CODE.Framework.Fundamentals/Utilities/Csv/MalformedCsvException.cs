@@ -1,5 +1,4 @@
-﻿using System;
-using System.Globalization;
+﻿using System.Globalization;
 using System.Runtime.Serialization;
 
 namespace CODE.Framework.Fundamentals.Utilities.Csv

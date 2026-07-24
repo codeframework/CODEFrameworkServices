@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
+		<TargetFramework>net10.0</TargetFramework>
 		<AssemblyVersion>2.0.20.0</AssemblyVersion>
 		<FileVersion>2.0.20.0</FileVersion>
 		<Version>2.0.20</Version>
@@ -17,7 +17,12 @@
 		<PackageIcon>CODEFrameworkLogoSmall.png</PackageIcon>
 		<RepositoryType>Git</RepositoryType>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
 		<Optimize>false</Optimize>

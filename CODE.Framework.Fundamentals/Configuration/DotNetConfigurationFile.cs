@@ -1,6 +1,4 @@
-﻿using System.Configuration;
-
-namespace CODE.Framework.Fundamentals.Configuration
+﻿namespace CODE.Framework.Fundamentals.Configuration
 {
     /// <summary>
     /// This class wraps up the functionality available natively in .NET for reading 

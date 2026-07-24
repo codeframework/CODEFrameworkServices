@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace CODE.Framework.Fundamentals.Utilities.Csv
+﻿namespace CODE.Framework.Fundamentals.Utilities.Csv
 {
     /// <summary>
     /// Provides data for the <see cref="M:CsvReader.ParseError"/> event.

@@ -1,6 +1,5 @@
 ﻿using CODE.Framework.Services.Server.AspNetCore.Properties;
 using Microsoft.AspNetCore.Http.Extensions;
-using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Claims;
@@ -85,7 +84,7 @@ public class ServiceHandler
                 HttpMethod = HttpRequest.Method.ToUpper()
             }
         };
-        context.HttpResponse.Headers.Add("x-powered-by", "CODE Framework - codeframework.io");
+        context.HttpResponse.Headers.XPoweredBy = "CODE Framework - codeframework.io";
 
         if (context.ServiceInstanceConfiguration.HttpsMode == ControllerHttpsMode.RequireHttps && HttpRequest.Scheme != "https")
             throw new UnauthorizedAccessException(Resources.ServiceMustBeAccessedOverHttps);
@@ -105,8 +104,7 @@ public class ServiceHandler
         {
             // If there was an exception, we may handle it automatically, IF either the operation or the entire type is flagged to auto-handle exceptions
             var handlerAttribute = context.MethodContext.MethodInfo.GetCustomAttributeEx<StandardExceptionHandlingAttribute>();
-            if (handlerAttribute is null)
-                handlerAttribute = context.MethodContext.MethodInfo.DeclaringType.GetCustomAttributeEx<StandardExceptionHandlingAttribute>();
+            handlerAttribute ??= context.MethodContext.MethodInfo.DeclaringType.GetCustomAttributeEx<StandardExceptionHandlingAttribute>();
 
             if (handlerAttribute is not null)
             {
@@ -122,7 +120,7 @@ public class ServiceHandler
                 context.HttpResponse.StatusCode = 500;
 
                 var message = ServiceHelper.ShowExtendedFailureInformation ? ServiceHelper.GetExceptionText(ex).Replace(Environment.NewLine, "  ") : $"Generic error in {context.MethodContext.MethodInfo.DeclaringType.Name}::{context.MethodContext.MethodInfo.Name}";
-                context.HttpResponse.Headers.Add("x-exception", message);
+                context.HttpResponse.Headers["x-exception"] = message;
 
                 return;
             }
@@ -134,8 +132,8 @@ public class ServiceHandler
         {
             // This is a special case in which we stream the file back low level (side-stepping any kind of JSON serialization)
             context.HttpResponse.ContentType = fileResponse.ContentType;
-            context.HttpResponse.Headers.Add("Content-Disposition" , $"inline; filename=\"{fileResponse.FileName.Trim()}\"");
-            await context.HttpResponse.Body.WriteAsync(fileResponse.FileBytes, 0, fileResponse.FileBytes.Length);
+            context.HttpResponse.Headers.ContentDisposition = $"inline; filename=\"{fileResponse.FileName.Trim()}\"";
+            await context.HttpResponse.Body.WriteAsync(fileResponse.FileBytes);
         }
         else
         {
@@ -176,10 +174,7 @@ public class ServiceHandler
         }
 
         // Let DI create the Service instance
-        var serviceInstance = HttpContext.RequestServices.GetService(serviceType);
-        if (serviceInstance == null)
-            throw new InvalidOperationException(string.Format(Resources.UnableToCreateTypeInstance, serviceType));
-
+        var serviceInstance = HttpContext.RequestServices.GetService(serviceType) ?? throw new InvalidOperationException(string.Format(Resources.UnableToCreateTypeInstance, serviceType));
         var principal = HttpContext.User;
         UserPrincipalHelper.AddPrincipal(serviceInstance, principal);
 
@@ -195,11 +190,9 @@ public class ServiceHandler
             else
                 handlerContext.ResultValue = await (dynamic) methodToInvoke.Invoke(serviceInstance, parameterList);
         }
-        catch (Exception ex)
+        catch
         {
             throw;
-            //throw new InvalidOperationException(string.Format(Resources.UnableToExecuteMethod, methodToInvoke.Name, ex));
-            //throw new InvalidOperationException(string.Format(Resources.UnableToExecuteMethod, methodToInvoke.Name, ex.Message));
         }
         finally
         {
@@ -215,7 +208,7 @@ public class ServiceHandler
     private async Task<object[]> GetMethodParametersAsync(ServiceHandlerRequestContext handlerContext)
     {
         // parameter parsing
-        var parameterList = new object[] { };
+        var parameterList = Array.Empty<object>();
 
         // simplistic - no parameters or single body post parameter
         var paramInfos = handlerContext.MethodContext.MethodInfo.GetParameters();
@@ -275,7 +268,7 @@ public class ServiceHandler
                 }
             }
 
-        parameterList = new[] {parameterData};
+        parameterList = [parameterData];
 
         return parameterList;
     }
@@ -290,7 +283,7 @@ public class ServiceHandler
     private static object UrlParameterToValue(string sourceString, Type targetType, CultureInfo culture = null)
     {
         var isEmpty = string.IsNullOrEmpty(sourceString);
-        if (culture == null) culture = CultureInfo.InvariantCulture;
+        culture ??= CultureInfo.InvariantCulture;
 
         if (targetType == typeof(string))
             return sourceString;
@@ -320,10 +313,10 @@ public class ServiceHandler
         else if (targetType.IsEnum)
             return Enum.Parse(targetType, sourceString);
         else if (targetType == typeof(byte[]))
-            return new byte[0]; // We are not supporting type arrays for this purpose
+            return Array.Empty<byte>(); // We are not supporting type arrays for this purpose
         else if (targetType.Name.StartsWith("Nullable`")) // Nullables are special. If they are null, we just return that. Otherwise, we unpack them and then run the current method again with that value.
         {
-            if (sourceString.ToLower() == "null" || sourceString == string.Empty)
+            if (sourceString.Equals("null", StringComparison.CurrentCultureIgnoreCase) || sourceString == string.Empty)
                 return null;
             else
             {
@@ -356,7 +349,7 @@ public class ServiceHandler
                 if (string.IsNullOrEmpty(rolesClaim.Value))
                     return; // no role requirement or empty and we're authenticated
 
-                var roles = rolesClaim.Value.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries);
+                var roles = rolesClaim.Value.Split([','], StringSplitOptions.RemoveEmptyEntries);
                 foreach (var role in roles)
                     if (authorizationRoles.Any(r => r == role))
                         return; // matched a role
@@ -376,8 +369,6 @@ public class ServiceHandler
 
         if (context.ServiceInstanceConfiguration.JsonFormatMode == JsonFormatModes.CamelCase)
             options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-        //else if (context.ServiceInstanceConfiguration.JsonFormatMode == JsonFormatModes.SnakeCase)
-        //    serializer.ContractResolver = SnakeCaseNamingStrategy;
 
 #if DEBUG
         options.WriteIndented = true;

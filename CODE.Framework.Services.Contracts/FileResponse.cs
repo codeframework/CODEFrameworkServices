@@ -1,6 +1,4 @@
-﻿using System.Runtime.Serialization;
-
-namespace CODE.Framework.Services.Contracts
+﻿namespace CODE.Framework.Services.Contracts
 {
     /// <summary>
     /// This response class can be used to return files to the caller.

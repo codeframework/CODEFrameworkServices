@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace CODE.Framework.Fundamentals.Utilities
+﻿namespace CODE.Framework.Fundamentals.Utilities
 {
     /// <summary>
     /// Static class providing convenience methods for common tasks

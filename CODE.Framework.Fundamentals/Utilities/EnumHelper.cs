@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace CODE.Framework.Fundamentals.Utilities
+﻿namespace CODE.Framework.Fundamentals.Utilities
 {
     /// <summary>
     /// This class provides various helper functions for dealing with enums

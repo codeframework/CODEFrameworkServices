@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace CODE.Framework.Fundamentals.Utilities.Csv
+﻿namespace CODE.Framework.Fundamentals.Utilities.Csv
 {
     public partial class CsvReader
     {
