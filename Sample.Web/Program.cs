@@ -7,8 +7,8 @@ builder.Services.AddHostedServices(config =>
 
     // This is an example of configuring hosted services in code. This can also be done in appsettings.json
     // The two services hosted in this API example deliberately set a variety of options for demonstration purposes.
-    config.Services.AddRange(new List<ServiceHandlerConfigurationInstance>
-    {
+    config.Services.AddRange(
+    [
         new() {
             ServiceType = typeof(UserService), // Using an explicit Type, which also implies the assembly the type is in
             RouteBasePath = "/api/users",
@@ -44,7 +44,7 @@ builder.Services.AddHostedServices(config =>
                 return Task.FromResult(true);
             }
         }
-    });
+    ]);
 
     // These are the defaults anyway, but they could manually be set to something different
     //config.Cors.UseCorsPolicy = true;

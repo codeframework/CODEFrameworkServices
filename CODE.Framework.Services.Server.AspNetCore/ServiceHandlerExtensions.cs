@@ -41,33 +41,33 @@ public static class ServiceHandlerExtensions
 
         foreach (var svc in config.Services)
         {
-            if (svc.ServiceType == null)
-            {
-                var type = ObjectHelper.GetTypeFromName(svc.ServiceTypeName);
-                if (type == null)
-                {
-                    var assemblyNameWithPath = svc.AssemblyName;
-                    if (assemblyNameWithPath.IndexOf("\\", StringComparison.Ordinal) < 0 && assemblyNameWithPath.IndexOf("/", StringComparison.Ordinal) < 0)
-                    {
-                        var entryAssembly = Assembly.GetEntryAssembly();
-                        if (entryAssembly != null)
-                        {
-                            var directoryName = Path.GetDirectoryName(entryAssembly.Location);
-                            if (directoryName != null) assemblyNameWithPath = Path.Combine(directoryName, assemblyNameWithPath);
-                        }
-                    }
+            //if (svc.ServiceType == null)
+            //{
+            //    var type = ObjectHelper.GetTypeFromName(svc.ServiceTypeName);
+            //    if (type == null)
+            //    {
+            //        var assemblyNameWithPath = svc.AssemblyName;
+            //        if (assemblyNameWithPath.IndexOf("\\", StringComparison.Ordinal) < 0 && assemblyNameWithPath.IndexOf("/", StringComparison.Ordinal) < 0)
+            //        {
+            //            var entryAssembly = Assembly.GetEntryAssembly();
+            //            if (entryAssembly != null)
+            //            {
+            //                var directoryName = Path.GetDirectoryName(entryAssembly.Location);
+            //                if (directoryName != null) assemblyNameWithPath = Path.Combine(directoryName, assemblyNameWithPath);
+            //            }
+            //        }
 
-                    var assemblyNameWithFullPath = Path.GetFullPath(assemblyNameWithPath);
-                    if (ObjectHelper.LoadAssembly(assemblyNameWithFullPath) == null)
-                        throw new ArgumentException(string.Format(Resources.InvalidServiceType, svc.ServiceTypeName));
-                    type = ObjectHelper.GetTypeFromName(svc.ServiceTypeName) ?? throw new ArgumentException(string.Format(Resources.InvalidServiceType, svc.ServiceTypeName));
-                }
+            //        var assemblyNameWithFullPath = Path.GetFullPath(assemblyNameWithPath);
+            //        if (ObjectHelper.LoadAssembly(assemblyNameWithFullPath) == null)
+            //            throw new ArgumentException(string.Format(Resources.InvalidServiceType, svc.ServiceTypeName));
+            //        type = ObjectHelper.GetTypeFromName(svc.ServiceTypeName) ?? throw new ArgumentException(string.Format(Resources.InvalidServiceType, svc.ServiceTypeName));
+            //    }
 
-                svc.ServiceType = type;
-            }
+            //    svc.ServiceType = type;
+            //}
 
             // Add to DI so we can compose the constructor
-            services.AddTransient(svc.ServiceType);
+            services.AddTransient(svc.GetInstantiatedServiceType());
         }
 
         // Add configured instance to DI
@@ -226,10 +226,8 @@ public static class ServiceHandlerExtensions
         return appBuilder;
     }
 
-    public static IApplicationBuilder UseMCPHandler(this IApplicationBuilder appBuilder, bool supportOpenApiJson = true, string generalMcpRoute = "")
+    public static IApplicationBuilder UseMCPHandler(this IApplicationBuilder appBuilder, bool supportOpenApiJson = true)
     {
-        //MCPRoutes ??= [generalMcpRoute];
-
         var serviceConfig = ServiceHandlerConfiguration.Current ?? throw new Exception("CODE Framework hosted services must be configured before UseMCPHandler() can be called. Use AddHostedServices() to configure which services are to be present in the hosting environment.");
         var configuration = appBuilder.ApplicationServices.GetService<IConfiguration>();
         var allowedHostsSetting = configuration?["MCP:AllowedHosts"] ?? configuration?["AllowedHosts"];
@@ -245,12 +243,36 @@ public static class ServiceHandlerExtensions
             appBuilder.MapWhen(
                                 context =>
                                 {
+                                    var applicableServiceConfigurations = GetApplicableServiceConfigurations(serviceConfig.Services, context.Request);
+                                    if (applicableServiceConfigurations == null || applicableServiceConfigurations.Count < 1) return false;
+
                                     var requestPath = context.Request.Path.ToString().Trim().ToLowerInvariant();
-                                    var toolsListFullRoute = !string.IsNullOrEmpty(generalMcpRoute) ? generalMcpRoute : "/mcp";
-                                    if (!toolsListFullRoute.StartsWith('/'))
-                                        toolsListFullRoute = $"/{toolsListFullRoute}";
-                                    toolsListFullRoute = toolsListFullRoute.Trim().ToLowerInvariant();
-                                    return requestPath == toolsListFullRoute;
+
+                                    // We try to match the most common case first
+                                    foreach (var applicableServiceConfiguration in applicableServiceConfigurations)
+                                    {
+                                        var definedRoutePath = applicableServiceConfiguration.MCPRouteBasePath;
+                                        if (!definedRoutePath.StartsWith('/')) definedRoutePath = $"/{definedRoutePath}";
+                                        if (requestPath.Equals(definedRoutePath, StringComparison.OrdinalIgnoreCase))
+                                            return true;
+                                    }
+
+                                    // Now we are looking for special cases
+                                    foreach (var applicableServiceConfiguration in applicableServiceConfigurations)
+                                    {
+                                        var definedRoutePath = applicableServiceConfiguration.MCPRouteBasePath;
+                                        if (!definedRoutePath.StartsWith('/')) definedRoutePath = $"/{definedRoutePath}";
+                                        var subRoutes = GetSpecialToolSubRoutes([applicableServiceConfiguration]);
+                                        if (subRoutes != null && subRoutes.Count > 0)
+                                        foreach (var subRoute in subRoutes)
+                                            {
+                                                var fullRoutePath = $"{definedRoutePath}/{subRoute}".Replace("//", "/");
+                                                if (requestPath.Equals(fullRoutePath, StringComparison.OrdinalIgnoreCase))
+                                                    return true;
+                                            }
+                                    }
+
+                                    return false;
                                 },
                                 builder =>
                                 {
@@ -268,12 +290,14 @@ public static class ServiceHandlerExtensions
                                     // Build up route mapping
                                     builder.UseRouter(routeBuilder =>
                                     {
-                                        var toolsListFullRoute = !string.IsNullOrEmpty(generalMcpRoute) ? generalMcpRoute : "/mcp";
-                                        if (!toolsListFullRoute.StartsWith('/'))
-                                            toolsListFullRoute = $"/{toolsListFullRoute}";
-                                        routeBuilder.MapVerb("GET", toolsListFullRoute, HandleMCPGet); // Indicates that GET is not allowed, only POST
-                                        routeBuilder.MapVerb("POST", toolsListFullRoute, HandleMCPPost(serviceConfig.Services, allowedHosts));
-                                        //MCPRoutes.Add(toolsListFullRoute);
+                                        var allMCPRoutes = GetAllMCPRoutes(serviceConfig.Services);
+                                        foreach (var route in allMCPRoutes)
+                                        {
+                                            var routePath = route;
+                                            if (!routePath.StartsWith('/')) routePath = $"/{routePath}";
+                                            routeBuilder.MapVerb("GET", routePath, HandleMCPGet); // Indicates that GET is not allowed, only POST
+                                            routeBuilder.MapVerb("POST", routePath, HandleMCPPost(serviceConfig.Services, allowedHosts));
+                                        }
                                     });
                                 });
         });
@@ -281,7 +305,63 @@ public static class ServiceHandlerExtensions
         return appBuilder;
     }
 
-    //private static List<string> MCPRoutes { get; set; }
+    //private static List<ServiceOperationDescription> GetToolsWithSubRoutes(List<ServiceHandlerConfigurationInstance> serviceConfigurations)
+    //{
+    //    var tools = new List<ServiceOperationDescription>();
+    //    var descriptions = GetHostedServiceDescriptions(serviceConfigurations, true);
+    //    foreach (var description in descriptions)
+    //        foreach (var operation in description.Operations)
+    //        {
+    //            var attribute = MCPHelper.GetExposedToolAttribute(operation.Method);
+    //            if (attribute != null && !string.IsNullOrWhiteSpace(attribute.SubRoute))
+    //                tools.Add(operation);
+    //        }
+    //    return tools;
+    //}
+
+    private static List<string> GetSpecialToolSubRoutes(List<ServiceHandlerConfigurationInstance> serviceConfigurations)
+    {
+        var subRoutes = new List<string>();
+        var descriptions = GetHostedServiceDescriptions(serviceConfigurations, true);
+        foreach (var description in descriptions)
+            foreach (var operation in description.Operations)
+            {
+                var attribute = MCPHelper.GetExposedToolAttribute(operation.Method);
+                if (attribute != null && !string.IsNullOrWhiteSpace(attribute.SubRoute))
+                {
+                    var subRoute = attribute.SubRoute.Trim().ToLower();
+                    if (!subRoute.StartsWith('/')) subRoute = $"/{subRoute}";
+                    subRoutes.Add(subRoute);
+                }
+            }
+        return subRoutes;
+    }
+    private static List<string> GetAllMCPRoutes(List<ServiceHandlerConfigurationInstance> services)
+    {
+        if (services == null || services.Count < 1) return [];
+
+        var routes = new List<string>();
+
+        foreach (var service in services)
+        {
+            var route = service.MCPRouteBasePath.Trim().ToLower();
+            if (!string.IsNullOrWhiteSpace(route) && !routes.Contains(route))
+                routes.Add(route);
+
+            var subRoutes = GetSpecialToolSubRoutes(services);
+            if (subRoutes != null)
+                foreach (var subRoute in subRoutes)
+                {
+                    var finalSubRoute = subRoute.Trim().ToLower();
+                    if (!finalSubRoute.StartsWith('/')) finalSubRoute = $"/{finalSubRoute}";
+                    var finalSpecialRoute = $"{route}{finalSubRoute}";
+                    if (!string.IsNullOrWhiteSpace(finalSpecialRoute) && !routes.Contains(finalSpecialRoute))
+                        routes.Add(finalSpecialRoute);
+                }
+        }
+
+        return routes;
+    }
 
     private static Task HandleMCPGet(HttpRequest req, HttpResponse resp, RouteData route)
     {
@@ -358,34 +438,7 @@ public static class ServiceHandlerExtensions
 
             if (method == "initialize")
             {
-                var requestedVersion = request.TryGetProperty("params", out var initializeParams) &&
-                                       initializeParams.ValueKind == JsonValueKind.Object &&
-                                       initializeParams.TryGetProperty("protocolVersion", out var versionElement) &&
-                                       versionElement.ValueKind == JsonValueKind.String
-                    ? versionElement.GetString()
-                    : null;
-
-                var supportedProtocolVersions = new[] { "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05" };
-                var protocolVersion = requestedVersion is null
-                    ? supportedProtocolVersions[0]
-                    : supportedProtocolVersions.Contains(requestedVersion)
-                        ? requestedVersion
-                        : supportedProtocolVersions[0];
-
-                resp.Headers["MCP-Protocol-Version"] = protocolVersion;
-                await WriteMcpJsonRpcResult(resp, id, writer =>
-                {
-                    writer.WriteString("protocolVersion", protocolVersion);
-                    writer.WriteStartObject("capabilities");
-                    writer.WriteStartObject("tools");
-                    writer.WriteBoolean("listChanged", false);
-                    writer.WriteEndObject();
-                    writer.WriteEndObject();
-                    writer.WriteStartObject("serverInfo");
-                    writer.WriteString("name", "CODE Framework Services");
-                    writer.WriteString("version", typeof(ServiceHandlerExtensions).Assembly.GetName().Version?.ToString() ?? "1.0.0");
-                    writer.WriteEndObject();
-                });
+                await WriteMcpInitializeResponse(serviceInstanceConfigurations, req, resp, request, id);
                 return;
             }
 
@@ -397,13 +450,7 @@ public static class ServiceHandlerExtensions
 
             if (method == "server/discover")
             {
-                await WriteMcpJsonRpcResult(resp, id, writer =>
-                {
-                    writer.WriteStartObject("server");
-                    writer.WriteString("name", "CODE Framework Services");
-                    writer.WriteString("version", typeof(ServiceHandlerExtensions).Assembly.GetName().Version?.ToString() ?? "1.0.0");
-                    writer.WriteEndObject();
-                });
+                await WriteMcpDiscoverResponse(serviceInstanceConfigurations, req, resp, id);
                 return;
             }
 
@@ -412,7 +459,7 @@ public static class ServiceHandlerExtensions
                 await WriteMcpJsonRpcResult(resp, id, writer =>
                 {
                     writer.WriteStartArray("tools");
-                    WriteMcpTools(writer, serviceInstanceConfigurations);
+                    WriteMcpTools(writer, serviceInstanceConfigurations, req);
                     writer.WriteEndArray();
                 });
                 return;
@@ -421,6 +468,113 @@ public static class ServiceHandlerExtensions
             await WriteMcpJsonRpcError(resp, id, -32601, $"Method not found: {method}");
         }
     };
+
+    private static async Task WriteMcpInitializeResponse(List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, HttpRequest req, HttpResponse resp, JsonElement request, JsonElement id)
+    {
+        var requestedVersion = request.TryGetProperty("params", out var initializeParams) &&
+                               initializeParams.ValueKind == JsonValueKind.Object &&
+                               initializeParams.TryGetProperty("protocolVersion", out var versionElement) &&
+                               versionElement.ValueKind == JsonValueKind.String
+            ? versionElement.GetString()
+            : null;
+
+        var supportedProtocolVersions = new[] { "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05" };
+        var protocolVersion = requestedVersion is null
+            ? supportedProtocolVersions[0]
+            : supportedProtocolVersions.Contains(requestedVersion)
+                ? requestedVersion
+                : supportedProtocolVersions[0];
+
+        resp.Headers["MCP-Protocol-Version"] = protocolVersion;
+        await WriteMcpJsonRpcResult(resp, id, writer =>
+        {
+            writer.WriteString("protocolVersion", protocolVersion);
+            writer.WriteStartObject("capabilities");
+            writer.WriteStartObject("tools");
+            writer.WriteBoolean("listChanged", false);
+            writer.WriteEndObject();
+            writer.WriteEndObject();
+            writer.WriteStartObject("serverInfo");
+            var applicableServiceConfigs = GetApplicableServiceConfigurations(serviceInstanceConfigurations, req);
+            if (applicableServiceConfigs == null || applicableServiceConfigs.Count < 1)
+            {
+                writer.WriteString("name", "CODE Framework Services");
+                writer.WriteString("version", typeof(ServiceHandlerExtensions).Assembly.GetName().Version?.ToString() ?? "1.0.0");
+            }
+            else
+            {
+                var displayNames = applicableServiceConfigs.Where(c => !string.IsNullOrEmpty(c.DisplayName)).Select(c => c.DisplayName).Distinct().OrderBy(d => d).ToList();
+                var displayName = displayNames.Count == 1 ? displayNames[0] : string.Join(", ", displayNames);
+
+                var displayVersions = applicableServiceConfigs.Where(c => !string.IsNullOrEmpty(c.DisplayVersion)).Select(c => c.DisplayVersion).Distinct().OrderBy(v => v).ToList();
+                var displayVersion = displayVersions.Count == 1 ? displayVersions[0] : string.Join(", ", displayVersions);
+
+                writer.WriteString("name", !string.IsNullOrEmpty(displayName) ? displayName : "CODE Framework Services");
+                writer.WriteString("version", !string.IsNullOrEmpty(displayVersion) ? displayVersion : "1.0.0");
+            }
+            writer.WriteEndObject();
+        });
+    }
+
+    private static async Task WriteMcpDiscoverResponse(List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, HttpRequest req, HttpResponse resp, JsonElement id)
+    {
+        var applicableServiceConfigs = GetApplicableServiceConfigurations(serviceInstanceConfigurations, req);
+        if (applicableServiceConfigs == null || applicableServiceConfigs.Count < 1)
+            // We do not really have anything, but at least we do not want to fail
+            await WriteMcpJsonRpcResult(resp, id, writer =>
+            {
+                writer.WriteStartObject("server");
+                writer.WriteString("name", "CODE Framework Services");
+                writer.WriteString("version", typeof(ServiceHandlerExtensions).Assembly.GetName().Version?.ToString() ?? "1.0.0");
+                writer.WriteEndObject();
+            });
+        else
+            // We have configured services, so we figure out which one to use
+            await WriteMcpJsonRpcResult(resp, id, writer =>
+            {
+                var displayNames = applicableServiceConfigs.Where(c => !string.IsNullOrEmpty(c.DisplayName)).Select(c => c.DisplayName).Distinct().OrderBy(d => d).ToList();
+                var displayName = displayNames.Count == 1 ? displayNames[0] : string.Join(", ", displayNames);
+
+                var displayVersions = applicableServiceConfigs.Where(c => !string.IsNullOrEmpty(c.DisplayVersion)).Select(c => c.DisplayVersion).Distinct().OrderBy(v => v).ToList();
+                var displayVersion = displayVersions.Count == 1 ? displayVersions[0] : string.Join(", ", displayVersions);
+
+                writer.WriteStartObject("server");
+                writer.WriteString("name", displayName);
+                writer.WriteString("version", displayVersion);
+                writer.WriteEndObject();
+            });
+    }
+
+    private static List<ServiceHandlerConfigurationInstance> GetApplicableServiceConfigurations(List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, HttpRequest req)
+    {
+        if (serviceInstanceConfigurations == null || serviceInstanceConfigurations.Count < 1) return null;
+
+        var path = req.Path.ToString().Trim().ToLowerInvariant();
+
+        var applicableConfigs = new List<ServiceHandlerConfigurationInstance>();
+        foreach (var config in serviceInstanceConfigurations)
+        {
+            var definedRoutePath = config.MCPRouteBasePath.Trim().ToLowerInvariant();
+            if (!definedRoutePath.StartsWith('/')) definedRoutePath = $"/{definedRoutePath}";
+            if (path.Equals(definedRoutePath, StringComparison.OrdinalIgnoreCase))
+                applicableConfigs.Add(config);
+            else
+            {
+                var specialOperations = GetSpecialToolSubRoutes([config]);
+                if (specialOperations != null && specialOperations.Count > 0)
+                    foreach (var subRoute in specialOperations)
+                    {
+                        var fullRoutePath = $"{definedRoutePath}/{subRoute}".Replace("//", "/");
+                        if (path.Equals(fullRoutePath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            applicableConfigs.Add(config);
+                            break;
+                        }
+                    }
+            }
+        }
+        return applicableConfigs;
+    }
 
     private static bool IsMcpHostAllowed(string host, string[] allowedHosts)
     {
@@ -456,10 +610,11 @@ public static class ServiceHandlerExtensions
             return;
         }
 
+        var requestPath = request.Path.ToString().Trim().ToLowerInvariant();
         var requestedName = nameElement.GetString();
         var toolMatches = GetHostedServiceDescriptions(serviceInstanceConfigurations, discoverForMcpTools: true)
             .SelectMany(service => service.Operations.Select(operation => (Service: service, Operation: operation)))
-            .Where(candidate => string.Equals(MCPHelper.GetToolName(candidate.Service, candidate.Operation), requestedName, StringComparison.Ordinal))
+            .Where(candidate => MCPHelper.ToolNameMatchesPath(requestedName, requestPath, candidate.Service, candidate.Operation))
             .ToList();
 
         if (toolMatches.Count != 1)
@@ -635,12 +790,25 @@ public static class ServiceHandlerExtensions
         return result;
     }
 
-    private static void WriteMcpTools(Utf8JsonWriter writer, List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations)
+    private static void WriteMcpTools(Utf8JsonWriter writer, List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, HttpRequest request)
     {
-        var serviceDescriptions = GetHostedServiceDescriptions(serviceInstanceConfigurations, discoverForMcpTools: true);
+        var requestPath = request.Path.ToString().Trim().ToLowerInvariant();
+
+        var applicableServices = GetApplicableServiceConfigurations(serviceInstanceConfigurations, request);
+        var serviceDescriptions = GetHostedServiceDescriptions(applicableServices, discoverForMcpTools: true, request: request);
         foreach (var serviceDescription in serviceDescriptions)
+        {
+            var exposedPath = serviceDescription.Configuration.MCPRouteBasePath.Trim().ToLower();
             foreach (var operation in serviceDescription.Operations)
             {
+                var operationExposedPath = exposedPath;
+                var exposedToolAttribute = MCPHelper.GetExposedToolAttribute(operation.Method);
+                if (!string.IsNullOrEmpty(exposedToolAttribute.SubRoute))
+                    operationExposedPath = $"{operationExposedPath}/{exposedToolAttribute.SubRoute}".Replace("//", "/").ToLower();
+
+                if (!request.Path.Equals(operationExposedPath))
+                    continue;
+
                 writer.WriteStartObject();
                 writer.WriteString("name", MCPHelper.GetToolName(serviceDescription, operation));
 
@@ -650,6 +818,7 @@ public static class ServiceHandlerExtensions
                 WriteMcpSchema(writer, operation.InputSchema);
                 writer.WriteEndObject();
             }
+        }
     }
 
     private static async Task WriteMcpJsonRpcResult(HttpResponse response, JsonElement id, Action<Utf8JsonWriter> writeResult)
@@ -686,7 +855,7 @@ public static class ServiceHandlerExtensions
         await writer.FlushAsync();
     }
 
-    private static List<HostedServiceDescription> GetHostedServiceDescriptions(List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, bool discoverForMcpTools = false)
+    private static List<HostedServiceDescription> GetHostedServiceDescriptions(List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, bool discoverForMcpTools = false, HttpRequest request = null)
     {
         var xmlDocumentationFiles = new Dictionary<Assembly, XmlCodeDocumentationFile>();
         var serviceDescriptions = new List<HostedServiceDescription>();

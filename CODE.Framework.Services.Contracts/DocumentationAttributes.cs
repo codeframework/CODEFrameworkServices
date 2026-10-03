@@ -54,6 +54,19 @@ public class ExposedToolAttribute() : Attribute
     /// <summary>Description of the tool (used by AI)</summary>
     /// <remarks>If empty, the system tries to use standard descriptions applied to the method. However, it is recommended to create an AI-specific description.</remarks>
     public string Description { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Sub-route for the MCP route. 
+    /// This is appended to the base route of the service.
+    /// </summary>
+    /// <remarks>
+    /// MCP tools are usually exposed to a client on a certain route (typically /mcp). 
+    /// This attribute allows to specify a sub-route for the tool, which is appended to the base route of the service. 
+    /// For example, if the base route is /mcp and the sub-route is /update, the full route for the tool would be /mcp/update.
+    /// This is useful when different parts of a tools package are to be exposed as if they were separate server.
+    /// For instance, some clients may not support tools that perform updates, so you may want to make those appear like a secondary MCP server.
+    /// </remarks>
+    public string SubRoute { get; set; }
 }
 
 /// <summary>

@@ -131,4 +131,20 @@ public static class MCPHelper
 
         return toolName;
     }
+
+    public static bool ToolNameMatchesPath(string toolName, string path, HostedServiceDescription serviceDescription, ServiceOperationDescription operation)
+    {
+        var toolExposedName = GetToolName(serviceDescription, operation);
+        if (string.IsNullOrEmpty(toolExposedName)) return false;
+
+        // If the tool name isn't a match, we can forget about it
+        if (!toolName.Equals(toolExposedName, StringComparison.OrdinalIgnoreCase)) return false;
+
+        // The tool name is a match, but are we on the right route?
+        var exposedToolAttribute = GetExposedToolAttribute(operation.Method);
+        var fullRoute = serviceDescription.Configuration.MCPRouteBasePath;
+        if (!string.IsNullOrEmpty(exposedToolAttribute.SubRoute))
+            fullRoute = $"{fullRoute}/{exposedToolAttribute.SubRoute}".Replace("//", "/");
+        return fullRoute.Equals(path, StringComparison.OrdinalIgnoreCase);
+    }
 }

@@ -93,7 +93,7 @@ public class CustomerService : ICustomerService, IServiceEvents
         }
     };
 
-    [ExposedTool, Description("Returns a photo (the actual bytes) based on the provided customer ID.")]
+    [ExposedTool(SubRoute = "Photos"), Description("Returns a photo (the actual bytes) based on the provided customer ID.")]
     public FileResponse GetPhoto(GetPhotoRequest request) => new()
     {
         ContentType = "image/png",
