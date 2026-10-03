@@ -9,8 +9,7 @@ builder.Services.AddHostedServices(config =>
     // The two services hosted in this API example deliberately set a variety of options for demonstration purposes.
     config.Services.AddRange(new List<ServiceHandlerConfigurationInstance>
     {
-        new ServiceHandlerConfigurationInstance
-        {
+        new() {
             ServiceType = typeof(UserService), // Using an explicit Type, which also implies the assembly the type is in
             RouteBasePath = "/api/users",
             JsonFormatMode = JsonFormatModes.CamelCase, // camel-case formats JSON like firstName
@@ -27,8 +26,7 @@ builder.Services.AddHostedServices(config =>
                 return Task.FromResult(true);
             }
         },
-        new ServiceHandlerConfigurationInstance
-        {
+        new() {
             ServiceTypeName = "Sample.Services.Implementation.CustomerService", // dynamically loaded type by specifying the name in a string
             AssemblyName = "Sample.Services.Implementation", // framework needs to load assembly
             RouteBasePath = "/api/customers",
@@ -80,5 +78,7 @@ app.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/openapi.json", "Service Description");
 });
+
+app.UseMCPHandler();
 
 app.Run();

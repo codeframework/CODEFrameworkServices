@@ -31,9 +31,12 @@ public interface ICustomerService
     DeleteCustomerResponse DeleteCustomer(DeleteCustomerRequest request);
 
     /// <summary>
-    /// Retrieves a list of customers
+    /// Returns a list of all customers.
     /// </summary>
+    /// <param name="request">Request object (empty parameters)</param>
+    /// <returns>A response with a list of customers</returns>
     [OperationContract, Rest(Method = RestMethods.Get, Name = "")]
+    [Description("Returns a list of all customers.")]
     GetCustomersResponse GetCustomers(GetCustomersRequest request);
 
     /// <summary>

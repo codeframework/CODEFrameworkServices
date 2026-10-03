@@ -82,28 +82,55 @@ public class OpenApiSchemaDefinition
     public JsonFormatModes JsonFormatMode { get; }
 }
 
-public class OpenApiPropertyDefinition
+public class MCPParametersSchemaDefinition
 {
-    public OpenApiPropertyDefinition(Type type, PropertyInfo info, string description = null, bool obsolete = false, string obsoleteReason = "")
-    {
-        Type = type;
-        PropertyInfo = info;
-        Description = description;
-        Obsolete = obsolete;
-        ObsoleteReason = obsoleteReason;
-    }
+    public string Description { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
+    public string Format { get; set; } = string.Empty;
+    public bool Nullable { get; set; }
+    public object DefaultValue { get; set; }
+    public List<object> EnumValues { get; } = [];
+    public Dictionary<string, MCPParametersSchemaDefinition> Properties { get; } = [];
+    public List<string> RequiredProperties { get; } = [];
+    public MCPParametersSchemaDefinition ArrayItemSchema { get; set; }
+}
 
-    public string Description { get; set; }
+public class ServiceOperationDescription(string path, string verb = "post", string operationId = "", MethodInfo method = null) : OpenApiPathInfo(path, verb, operationId, method)
+{
+    public string Name { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string HttpVerb { get; set; } = "post";
+    public string Route { get; set; } = string.Empty;
 
-    public bool Obsolete { get; set; }
+    /// <summary>
+    /// Input schema for MCP tools only
+    /// </summary>
+    public MCPParametersSchemaDefinition InputSchema { get; set; }
+    public bool IsExposedMcpTool { get; set; } = false;
+}
 
-    public string ObsoleteReason { get; set; }
+public class HostedServiceDescription(ServiceHandlerConfigurationInstance configuration, Type contractType)
+{
+    public ServiceHandlerConfigurationInstance Configuration { get; } = configuration;
+    public Type ContractType { get; } = contractType;
+    public string Description { get; set; } = string.Empty;
+    public ExternalCodeDocumentation ExternalDocs { get; set; }
+    public List<ServiceOperationDescription> Operations { get; } = [];
+}
+
+public class OpenApiPropertyDefinition(Type type, PropertyInfo info, string description = null, bool obsolete = false, string obsoleteReason = "")
+{
+    public string Description { get; set; } = description;
+
+    public bool Obsolete { get; set; } = obsolete;
+
+    public string ObsoleteReason { get; set; } = obsoleteReason;
 
     public string Name => Type.Name;
 
-    public Type Type { get; init; } = typeof(string);
+    public Type Type { get; init; } = type;
 
-    public PropertyInfo PropertyInfo { get; set; }
+    public PropertyInfo PropertyInfo { get; set; } = info;
 
     public bool IsSimpleType
     {
@@ -129,11 +156,9 @@ public class OpenApiPropertyDefinition
     }
 }
 
-public class OpenApiVerb
+public class OpenApiVerb(string operationId)
 {
-    public OpenApiVerb(string operationId) => OperationId = operationId;
-
-    public string OperationId { get; set; } = string.Empty;
+    public string OperationId { get; set; } = operationId;
     public string Summary { get; internal set; } = string.Empty;
     public string Description { get; internal set; } = string.Empty;
 }
@@ -142,10 +167,10 @@ public class OpenApiTag
 {
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
-    public OpenApiExternalDocumentation ExternalDocs { get; set; } = null;
+    public ExternalCodeDocumentation ExternalDocs { get; set; } = null;
 }
 
-public class OpenApiExternalDocumentation
+public class ExternalCodeDocumentation
 {
     public string Description { get; set; } = string.Empty;
     public string Url { get; set; } = string.Empty;
@@ -709,7 +734,7 @@ public static class OpenApiHelper
         writer.WriteStringValue($"#/components/schemas/{type.FullName}");
     }
 
-    public static OpenApiSchemaDefinition GetTypeDefinition(Type type, bool obsolete, string obsoleteReason, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles, JsonFormatModes jsonFormatMode)
+    public static OpenApiSchemaDefinition GetTypeDefinition(Type type, bool obsolete, string obsoleteReason, Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles, JsonFormatModes jsonFormatMode)
     {
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>))
         {
@@ -758,7 +783,7 @@ public static class OpenApiHelper
         return schema;
     }
 
-    public static void AddTypeToComponents(OpenApiInformation openApiInfo, Type type, bool obsolete, string obsoleteReason, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles, JsonFormatModes jsonFormatMode)
+    public static void AddTypeToComponents(OpenApiInformation openApiInfo, Type type, bool obsolete, string obsoleteReason, Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles, JsonFormatModes jsonFormatMode)
     {
         var typeDefinition = GetTypeDefinition(type, obsolete, obsoleteReason, xmlDocumentationFiles, jsonFormatMode);
         if (openApiInfo.Components.ContainsKey(typeDefinition.Name)) return;
@@ -786,7 +811,7 @@ public static class OpenApiHelper
         }
     }
 
-    public static void ExtractOpenApiParameters(MethodInfo methodInfo, OpenApiPathInfo pathInfo, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles, bool isGet = false)
+    public static void ExtractOpenApiParameters(MethodInfo methodInfo, OpenApiPathInfo pathInfo, Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles, bool isGet = false)
     {
         var methodParameters = methodInfo.GetParameters();
         if (methodParameters.Length > 0)
@@ -834,20 +859,20 @@ public static class OpenApiHelper
         }
     }
 
-    public static OpenApiExternalDocumentation GetExternalDocs(Type implementationType, Type interfaceType)
+    public static ExternalCodeDocumentation GetExternalDocs(Type implementationType, Type interfaceType)
     {
         var attribute = implementationType.GetCustomAttributeEx<ExternalDocumentationAttribute>();
         if (attribute != null)
-            return new OpenApiExternalDocumentation { Description = attribute.Description, Url = attribute.Url };
+            return new ExternalCodeDocumentation { Description = attribute.Description, Url = attribute.Url };
 
         var attribute2 = interfaceType.GetCustomAttributeEx<ExternalDocumentationAttribute>();
         if (attribute2 != null)
-            return new OpenApiExternalDocumentation { Description = attribute2.Description, Url = attribute2.Url };
+            return new ExternalCodeDocumentation { Description = attribute2.Description, Url = attribute2.Url };
 
         return null;
     }
 
-    public static string GetSummary(Type type, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles)
+    public static string GetSummary(Type type, Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles)
     {
         var summaryAttribute = type.GetCustomAttributeEx<SummaryAttribute>();
         if (summaryAttribute != null && !string.IsNullOrEmpty(summaryAttribute.Summary))
@@ -863,7 +888,7 @@ public static class OpenApiHelper
         return string.Empty;
     }
 
-    public static string GetDescription(Type type, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles)
+    public static string GetDescription(Type type, Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles)
     {
         var descriptionAttribute = type.GetCustomAttributeEx<DescriptionAttribute>();
         if (descriptionAttribute != null && !string.IsNullOrEmpty(descriptionAttribute.Description))
@@ -883,8 +908,18 @@ public static class OpenApiHelper
         return string.Empty;
     }
 
-    public static string GetDescription(Type implementationType, Type interfaceType, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles)
+    public static string GetDescription(Type implementationType, Type interfaceType, Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles, bool useToolDescriptionIfAvailable = false)
     {
+        if (useToolDescriptionIfAvailable)
+        {
+            var toolDescriptionAttribute = implementationType.GetCustomAttributeEx<ToolDescriptionAttribute>();
+            if (toolDescriptionAttribute != null && !string.IsNullOrEmpty(toolDescriptionAttribute.Description))
+                return toolDescriptionAttribute.Description.Trim();
+            var toolDescriptionAttribute2 = interfaceType.GetCustomAttributeEx<ToolDescriptionAttribute>();
+            if (toolDescriptionAttribute2 != null && !string.IsNullOrEmpty(toolDescriptionAttribute2.Description))
+                return toolDescriptionAttribute2.Description.Trim();
+        }
+
         var descriptionAttribute = implementationType.GetCustomAttributeEx<DescriptionAttribute>();
         if (descriptionAttribute != null && !string.IsNullOrEmpty(descriptionAttribute.Description))
             return descriptionAttribute.Description.Trim();
@@ -918,7 +953,7 @@ public static class OpenApiHelper
         return string.Empty;
     }
 
-    public static string GetDescription(PropertyInfo property, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles)
+    public static string GetDescription(PropertyInfo property, Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles)
     {
         var descriptionAttribute = property.GetCustomAttributeEx<DescriptionAttribute>();
         if (descriptionAttribute != null && !string.IsNullOrEmpty(descriptionAttribute.Description))
@@ -938,7 +973,7 @@ public static class OpenApiHelper
         return string.Empty;
     }
 
-    public static string GetDescription(MethodInfo interfaceMethod, Type methodInterface, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles)
+    public static string GetDescription(MethodInfo interfaceMethod, Type methodInterface, Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles)
     {
         var descriptionAttribute = interfaceMethod.GetCustomAttributeEx<DescriptionAttribute>();
         if (descriptionAttribute != null && !string.IsNullOrEmpty(descriptionAttribute.Description))
@@ -958,7 +993,7 @@ public static class OpenApiHelper
         return string.Empty;
     }
 
-    public static string GetSummary(MethodInfo interfaceMethod, Type methodInterface, Dictionary<Assembly, OpenApiXmlDocumentationFile> xmlDocumentationFiles)
+    public static string GetSummary(MethodInfo interfaceMethod, Type methodInterface, Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles)
     {
         var ummaryAttribute = interfaceMethod.GetCustomAttributeEx<SummaryAttribute>();
         if (ummaryAttribute != null && !string.IsNullOrEmpty(ummaryAttribute.Summary))
@@ -1116,13 +1151,13 @@ public class OpenApiPositionalOperationParameter : OpenApiNamedOperationParamete
     public int PositionIndex { get; set; }
 }
 
-public class OpenApiXmlDocumentationFile
+public class XmlCodeDocumentationFile
 {
-    public OpenApiXmlDocumentationFile(Assembly assembly)
+    public XmlCodeDocumentationFile(Assembly assembly)
     {
         var xmlFileLocation = assembly.Location;
         if (xmlFileLocation.ToLowerInvariant().EndsWith(".dll"))
-            xmlFileLocation = xmlFileLocation.Substring(0, xmlFileLocation.Length - 4) + ".xml";
+            xmlFileLocation = $"{xmlFileLocation.Substring(0, xmlFileLocation.Length - 4)}.xml";
 
         try
         {

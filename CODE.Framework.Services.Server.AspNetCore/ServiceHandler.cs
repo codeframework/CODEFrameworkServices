@@ -85,7 +85,7 @@ public class ServiceHandler
                 HttpMethod = HttpRequest.Method.ToUpper()
             }
         };
-        context.HttpResponse.Headers.Add("x-powered-by", "CODE Framework - codeframework.io");
+        context.HttpResponse.Headers.Append("x-powered-by", "CODE Framework - codeframework.io");
 
         if (context.ServiceInstanceConfiguration.HttpsMode == ControllerHttpsMode.RequireHttps && HttpRequest.Scheme != "https")
             throw new UnauthorizedAccessException(Resources.ServiceMustBeAccessedOverHttps);
@@ -122,7 +122,7 @@ public class ServiceHandler
                 context.HttpResponse.StatusCode = 500;
 
                 var message = ServiceHelper.ShowExtendedFailureInformation ? ServiceHelper.GetExceptionText(ex).Replace(Environment.NewLine, "  ") : $"Generic error in {context.MethodContext.MethodInfo.DeclaringType.Name}::{context.MethodContext.MethodInfo.Name}";
-                context.HttpResponse.Headers.Add("x-exception", message);
+                context.HttpResponse.Headers.Append("x-exception", message);
 
                 return;
             }
@@ -134,7 +134,7 @@ public class ServiceHandler
         {
             // This is a special case in which we stream the file back low level (side-stepping any kind of JSON serialization)
             context.HttpResponse.ContentType = fileResponse.ContentType;
-            context.HttpResponse.Headers.Add("Content-Disposition" , $"inline; filename=\"{fileResponse.FileName.Trim()}\"");
+            context.HttpResponse.Headers.Append("Content-Disposition" , $"inline; filename=\"{fileResponse.FileName.Trim()}\"");
             await context.HttpResponse.Body.WriteAsync(fileResponse.FileBytes, 0, fileResponse.FileBytes.Length);
         }
         else

@@ -14,18 +14,19 @@ public class CustomerService : ICustomerService, IServiceEvents
         SecondDateReturned = request.SecondDate
     };
 
+    [ExposedTool]
     public GetCustomersResponse GetCustomers(GetCustomersRequest request)
     {
-        var response = new GetCustomersResponse();
-
         // Real code goes here...
-
-        response.CustomerList = new List<Customer>
+        var response = new GetCustomersResponse
         {
-            new Customer { Name = "Markus Egger", Company = "CODE" },
-            new Customer { Name = "Ellen Whitney", Company = "CODE" },
-            new Customer { Name = "Mike Yeager", Company = "CODE" },
-            new Customer { Name = "Otto Dobretsberger", Company = "CODE" }
+            CustomerList =
+            [
+                new Customer { Name = "Markus Egger", Company = "CODE" },
+                new Customer { Name = "Ellen Whitney", Company = "CODE" },
+                new Customer { Name = "Mike Yeager", Company = "CODE" },
+                new Customer { Name = "Otto Dobretsberger", Company = "CODE" }
+            ]
         };
 
         // var x = response.CustomerList[20];   // Put this line in to simulare an exception and trigger automatic exception handline
@@ -35,16 +36,16 @@ public class CustomerService : ICustomerService, IServiceEvents
 
     public async Task<GetCustomersResponse> GetCustomersAsync(GetCustomersRequest request)
     {
-        var response = new GetCustomersResponse();
-
         // Real code goes here...
-
-        response.CustomerList = new List<Customer>
+        var response = new GetCustomersResponse
         {
-            new Customer { Name = "Markus Egger", Company = "CODE" },
-            new Customer { Name = "Ellen Whitney", Company = "CODE" },
-            new Customer { Name = "Mike Yeager", Company = "CODE" },
-            new Customer { Name = "Otto Dobretsberger", Company = "CODE" }
+            CustomerList =
+            [
+                new Customer { Name = "Markus Egger", Company = "CODE" },
+                new Customer { Name = "Ellen Whitney", Company = "CODE" },
+                new Customer { Name = "Mike Yeager", Company = "CODE" },
+                new Customer { Name = "Otto Dobretsberger", Company = "CODE" }
+            ]
         };
 
         // var x = response.CustomerList[20];   // Put this line in to simulare an exception and trigger automatic exception handline
@@ -61,6 +62,7 @@ public class CustomerService : ICustomerService, IServiceEvents
         };
     }
 
+    [ExposedTool(Name = "SearchCustomers", Description = "Returns customers based on the provided search string (inactive customers can optionally be included).")]
     public SearchTestResponse SearchTest(SearchTestRequest request)
     {
         var response = new SearchTestResponse
@@ -80,7 +82,8 @@ public class CustomerService : ICustomerService, IServiceEvents
         return response;
     }
 
-    public GetCustomerResponse GetCustomer(GetCustomerRequest request) => new GetCustomerResponse
+    [ExposedTool(Description = "Returns a customer based on the provided customer ID.")]
+    public GetCustomerResponse GetCustomer(GetCustomerRequest request) => new()
     {
         Customer = new Customer 
         { 
@@ -90,7 +93,8 @@ public class CustomerService : ICustomerService, IServiceEvents
         }
     };
 
-    public FileResponse GetPhoto(GetPhotoRequest request) => new FileResponse
+    [ExposedTool, Description("Returns a photo (the actual bytes) based on the provided customer ID.")]
+    public FileResponse GetPhoto(GetPhotoRequest request) => new()
     {
         ContentType = "image/png",
         FileName = "ExampleImage.png",

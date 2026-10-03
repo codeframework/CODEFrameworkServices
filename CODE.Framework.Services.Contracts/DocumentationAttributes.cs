@@ -3,74 +3,107 @@
 /// <summary>
 /// Generic description attribute usable in all service elements
 /// </summary>
+/// <remarks>
+/// Constructor
+/// </remarks>
+/// <param name="description">Description text</param>
 [AttributeUsage(AttributeTargets.All, Inherited = true)]
-public class DescriptionAttribute : Attribute
+public class DescriptionAttribute(string description) : Attribute
 {
-    /// <summary>
-    /// Constructor
-    /// </summary>
-    /// <param name="description">Description text</param>
-    public DescriptionAttribute(string description) => Description = description;
 
     /// <summary>
     /// Description text (depending on usage, this may or may not support markdown)
     /// </summary>
+    public string Description { get; set; } = description;
+}
+
+/// <summary>
+/// Tools Description attribute used to describe something for use with AI tools.
+/// </summary>
+/// <remarks>Constructor</remarks>
+/// <param name="description">Description text</param>
+[AttributeUsage(AttributeTargets.All, Inherited = true)]
+public class ToolDescriptionAttribute(string description) : Attribute
+{
+    /// <summary>
+    /// Description text (depending on usage, this may or may not support markdown)
+    /// </summary>
+    public string Description { get; set; } = description;
+}
+
+/// <summary>
+/// Indicates whether a tool is exposed in MCP
+/// </summary>
+public class ExposedToolAttribute() : Attribute
+{
+    /// <summary>
+    /// Indicates whether the tool is exposed in MCP
+    /// </summary>
+    public bool IsExposed { get; set; } = true;
+
+    /// <summary>
+    /// Exposed name of the tool. 
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Exposed human readable title of the tool
+    /// </summary>
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>Description of the tool (used by AI)</summary>
+    /// <remarks>If empty, the system tries to use standard descriptions applied to the method. However, it is recommended to create an AI-specific description.</remarks>
     public string Description { get; set; } = string.Empty;
 }
 
 /// <summary>
 /// Generic summary attribute usable in all service elements
 /// </summary>
+/// <remarks>
+/// Constructor
+/// </remarks>
+/// <param name="summary">Summary text</param>
 [AttributeUsage(AttributeTargets.All, Inherited = true)]
-public class SummaryAttribute : Attribute
+public class SummaryAttribute(string summary) : Attribute
 {
-    /// <summary>
-    /// Constructor
-    /// </summary>
-    /// <param name="summary">Summary text</param>
-    public SummaryAttribute(string summary) => Summary = summary;
-
     /// <summary>
     /// Summary text (depending on usage, this may or may not support markdown)
     /// </summary>
-    public string Summary { get; set; } = string.Empty;
+    public string Summary { get; set; } = summary;
 }
 
 /// <summary>
 /// Generic external documentation attribute usable in all service elements
 /// </summary>
+/// <remarks>
+/// Constructor
+/// </remarks>
+/// <param name="description">Description text</param>
+/// <param name="url">Full URL for the external description</param>
 [AttributeUsage(AttributeTargets.All, Inherited = true)]
-public class ExternalDocumentationAttribute : Attribute
+public class ExternalDocumentationAttribute(string description, string url) : Attribute
 {
-    public ExternalDocumentationAttribute(string description, string url)
-    {
-        Description = description;
-        Url = url;
-    }
-
     /// <summary>
     /// Description text (depending on usage, this may or may not support markdown)
     /// </summary>
-    public string Description { get; set; } = string.Empty;
+    public string Description { get; set; } = description;
 
     /// <summary>
     /// Full URL for the external description
     /// </summary>
-    public string Url { get; set; } = string.Empty;
+    public string Url { get; set; } = url;
 }
 
 /// <summary>
 /// Can be used to specify a custom content type for REST calls. (Used for things such as FileResponse contracts)
 /// </summary>
 [AttributeUsage(AttributeTargets.All, Inherited = true)]
-public class RestContentTypeAttribute : Attribute
+public class RestContentTypeAttribute(string contentType) : Attribute
 {
-    public RestContentTypeAttribute(string contentType) => ContentType = contentType;
-
     /// <summary>
     /// Content type
     /// </summary>
-    public string ContentType { get; set; } = "application/json";
+    public string ContentType { get; set; } = contentType;
 }
 
 /// <summary>
