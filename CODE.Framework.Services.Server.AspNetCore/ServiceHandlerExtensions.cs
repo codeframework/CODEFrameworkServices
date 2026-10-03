@@ -228,7 +228,7 @@ public static class ServiceHandlerExtensions
 
     public static IApplicationBuilder UseMCPHandler(this IApplicationBuilder appBuilder, bool supportOpenApiJson = true, string generalMcpRoute = "")
     {
-        MCPRoutes ??= [generalMcpRoute];
+        //MCPRoutes ??= [generalMcpRoute];
 
         var serviceConfig = ServiceHandlerConfiguration.Current ?? throw new Exception("CODE Framework hosted services must be configured before UseMCPHandler() can be called. Use AddHostedServices() to configure which services are to be present in the hosting environment.");
         var configuration = appBuilder.ApplicationServices.GetService<IConfiguration>();
@@ -273,7 +273,7 @@ public static class ServiceHandlerExtensions
                                             toolsListFullRoute = $"/{toolsListFullRoute}";
                                         routeBuilder.MapVerb("GET", toolsListFullRoute, HandleMCPGet); // Indicates that GET is not allowed, only POST
                                         routeBuilder.MapVerb("POST", toolsListFullRoute, HandleMCPPost(serviceConfig.Services, allowedHosts));
-                                        MCPRoutes.Add(toolsListFullRoute);
+                                        //MCPRoutes.Add(toolsListFullRoute);
                                     });
                                 });
         });
@@ -281,7 +281,7 @@ public static class ServiceHandlerExtensions
         return appBuilder;
     }
 
-    private static List<string> MCPRoutes { get; set; }
+    //private static List<string> MCPRoutes { get; set; }
 
     private static Task HandleMCPGet(HttpRequest req, HttpResponse resp, RouteData route)
     {

@@ -43,7 +43,7 @@ public class RestProxyHandler : IProxyHandler
         var exposedMethodName = RestHelper.GetExposedMethodNameFromContract(method.Name, httpMethod, _contractType);
         var serviceUri = _serviceUri.AbsoluteUri.Trim();
         if (serviceUri.EndsWith("/")) serviceUri = serviceUri.Substring(0, serviceUri.Length - 1);
-        var serviceUriAbsoluteUri = serviceUri + "/" + exposedMethodName;
+        var serviceUriAbsoluteUri = $"{serviceUri}/{exposedMethodName}";
 
         try
         {
@@ -99,24 +99,14 @@ public class RestProxyHandler : IProxyHandler
                 using var client = new WebClient();
                 client.Headers.Add("Content-Type", "application/json; charset=utf-8");
                 client.Encoding = Encoding.UTF8;
-                string restResponse;
-
                 var serializedData = RestHelper.SerializeToUrlParameters(data, httpMethod);
                 var serviceFullUrl = serviceUriAbsoluteUri + serializedData;
-
-                switch (httpMethod)
+                var restResponse = httpMethod switch
                 {
-                    case "POST":
-                        restResponse = client.UploadString(serviceFullUrl, JsonHelper.SerializeToRestJson(data));
-                        break;
-                    case "GET":
-                        restResponse = client.DownloadString(serviceFullUrl);
-                        break;
-                    default:
-                        restResponse = client.UploadString(serviceFullUrl, httpMethod, JsonHelper.SerializeToRestJson(data));
-                        break;
-                }
-
+                    "POST" => client.UploadString(serviceFullUrl, JsonHelper.SerializeToRestJson(data)),
+                    "GET" => client.DownloadString(serviceFullUrl),
+                    _ => client.UploadString(serviceFullUrl, httpMethod, JsonHelper.SerializeToRestJson(data)),
+                };
                 return JsonHelper.DeserializeFromRestJson(restResponse, method.ReturnType);
             }
         }

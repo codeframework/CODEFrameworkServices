@@ -16,12 +16,12 @@ builder.Services.AddHostedServices(config =>
             OnAuthorize = context =>
             {
                 // fake a user context 
-                context.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(new[]
-                {
+                context.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+                [
                     new Claim("Permission", "CanViewPage"),
                     new Claim(ClaimTypes.Role, "Administrator"),
                     new Claim(ClaimTypes.NameIdentifier, "Markus E. User")
-                }, "Basic"));
+                ], "Basic"));
 
                 return Task.FromResult(true);
             }
@@ -34,12 +34,12 @@ builder.Services.AddHostedServices(config =>
             OnAuthorize = context =>
             {
                 // fake a user context 
-                context.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(new[]
-                {
+                context.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+                [
                     new Claim("Permission", "CanViewPage"),
                     new Claim(ClaimTypes.Role, "Administrators"),
                     new Claim(ClaimTypes.NameIdentifier, "Markus E. Customer")
-                }, "Basic"));
+                ], "Basic"));
 
                 return Task.FromResult(true);
             }
@@ -60,9 +60,6 @@ var app = builder.Build();
 // Showing some extra info in dev-mode
 if (builder.Environment.IsDevelopment()) app.ShowExtendedFailureInformation();
 
-// Enabled the CODE Framework service hosting environment
-app.UseServiceHandler(); 
-
 // Add CODE Framework OpenAPI support
 app.UseOpenApiHandler(info: new OpenApiInfo
 {
@@ -79,6 +76,10 @@ app.UseSwaggerUI(options =>
     options.SwaggerEndpoint("/openapi.json", "Service Description");
 });
 
+// Enabled the CODE Framework REST service hosting environment
+app.UseServiceHandler();
+
+// Enable the CODE Framework Message Communication Protocol (MCP) hosting environment (for AI and other clients that use the MCP protocol)
 app.UseMCPHandler();
 
 app.Run();
