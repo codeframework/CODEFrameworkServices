@@ -122,7 +122,7 @@ public class ServiceHandlerConfigurationInstance
     /// <summary>
     /// If this service is hosted as an MCP server, this is the base path for the MCP route. Default is /mcp
     /// </summary>
-    public string MCPRouteBasePath { get; set; } = "/mcp";
+    public string McpRouteBasePath { get; set; } = "/mcp";
 
     public string DisplayName
     {

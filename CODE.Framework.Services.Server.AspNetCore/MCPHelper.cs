@@ -2,7 +2,7 @@
 
 namespace CODE.Framework.Services.Server.AspNetCore;
 
-public static class MCPHelper
+public static class McpHelper
 {
     public static string GetDescription(MethodInfo interfaceMethod, Type methodInterface, ExposedToolAttribute exposedToolAttribute, Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles)
     {
@@ -142,7 +142,7 @@ public static class MCPHelper
 
         // The tool name is a match, but are we on the right route?
         var exposedToolAttribute = GetExposedToolAttribute(operation.Method);
-        var fullRoute = serviceDescription.Configuration.MCPRouteBasePath;
+        var fullRoute = serviceDescription.Configuration.McpRouteBasePath;
         if (!string.IsNullOrEmpty(exposedToolAttribute.SubRoute))
             fullRoute = $"{fullRoute}/{exposedToolAttribute.SubRoute}".Replace("//", "/");
         return fullRoute.Equals(path, StringComparison.OrdinalIgnoreCase);

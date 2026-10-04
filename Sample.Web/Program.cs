@@ -80,6 +80,6 @@ app.UseSwaggerUI(options =>
 app.UseServiceHandler();
 
 // Enable the CODE Framework Message Communication Protocol (MCP) hosting environment (for AI and other clients that use the MCP protocol)
-app.UseMCPHandler();
+app.UseMcpHandler();
 
 app.Run();

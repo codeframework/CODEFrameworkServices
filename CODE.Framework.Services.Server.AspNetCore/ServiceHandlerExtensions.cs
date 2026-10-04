@@ -312,14 +312,19 @@ public static class ServiceHandlerExtensions
         return normalizedPath.ToLowerInvariant();
     }
 
-    public static IApplicationBuilder UseMCPHandler(this IApplicationBuilder appBuilder, bool supportOpenApiJson = true)
+    public static IApplicationBuilder UseMcpHandler(this IApplicationBuilder appBuilder, bool supportOpenApiJson = true)
     {
-        var serviceConfig = ServiceHandlerConfiguration.Current ?? throw new Exception("CODE Framework hosted services must be configured before UseMCPHandler() can be called. Use AddHostedServices() to configure which services are to be present in the hosting environment.");
+        var serviceConfig = ServiceHandlerConfiguration.Current ?? throw new Exception("CODE Framework hosted services must be configured before UseMcpHandler() can be called. Use AddHostedServices() to configure which services are to be present in the hosting environment.");
         var configuration = appBuilder.ApplicationServices.GetService<IConfiguration>();
         var allowedHostsSetting = configuration?["MCP:AllowedHosts"] ?? configuration?["AllowedHosts"];
         var allowedHosts = string.IsNullOrWhiteSpace(allowedHostsSetting)
             ? ["*"]
             : allowedHostsSetting.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        var allowedOriginsSetting = configuration?["MCP:AllowedOrigins"] ?? serviceConfig.Cors?.AllowedOrigins;
+        var allowedOrigins = string.IsNullOrWhiteSpace(allowedOriginsSetting)
+            ? ["*"]
+            : allowedOriginsSetting.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         // Endpoints require routing, so we make sure it is there
         appBuilder.UseRouting();
@@ -337,7 +342,7 @@ public static class ServiceHandlerExtensions
                                     // We try to match the most common case first
                                     foreach (var applicableServiceConfiguration in applicableServiceConfigurations)
                                     {
-                                        var definedRoutePath = applicableServiceConfiguration.MCPRouteBasePath;
+                                        var definedRoutePath = applicableServiceConfiguration.McpRouteBasePath;
                                         if (!definedRoutePath.StartsWith('/')) definedRoutePath = $"/{definedRoutePath}";
                                         if (requestPath.Equals(definedRoutePath, StringComparison.OrdinalIgnoreCase))
                                             return true;
@@ -346,7 +351,7 @@ public static class ServiceHandlerExtensions
                                     // Now we are looking for special cases
                                     foreach (var applicableServiceConfiguration in applicableServiceConfigurations)
                                     {
-                                        var definedRoutePath = applicableServiceConfiguration.MCPRouteBasePath;
+                                        var definedRoutePath = applicableServiceConfiguration.McpRouteBasePath;
                                         if (!definedRoutePath.StartsWith('/')) definedRoutePath = $"/{definedRoutePath}";
                                         var subRoutes = GetSpecialToolSubRoutes([applicableServiceConfiguration]);
                                         if (subRoutes != null && subRoutes.Count > 0)
@@ -370,19 +375,26 @@ public static class ServiceHandlerExtensions
                                             return;
                                         }
 
+                                        if (!IsMcpOriginAllowed(context.Request.Headers.Origin.ToString(), allowedOrigins))
+                                        {
+                                            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                                            return;
+                                        }
+
                                         await next();
                                     });
 
                                     // Build up route mapping
                                     builder.UseRouter(routeBuilder =>
                                     {
-                                        var allMCPRoutes = GetAllMCPRoutes(serviceConfig.Services);
-                                        foreach (var route in allMCPRoutes)
+                                        var allMcpRoutes = GetAllMcpRoutes(serviceConfig.Services);
+                                        foreach (var route in allMcpRoutes)
                                         {
                                             var routePath = route;
                                             if (!routePath.StartsWith('/')) routePath = $"/{routePath}";
-                                            routeBuilder.MapVerb("GET", routePath, HandleMCPGet); // Indicates that GET is not allowed, only POST
-                                            routeBuilder.MapVerb("POST", routePath, HandleMCPPost(serviceConfig.Services, allowedHosts));
+                                            routeBuilder.MapVerb("GET", routePath, HandleMcpGet(allowedOrigins)); // Indicates that GET is not allowed, only POST
+                                            routeBuilder.MapVerb("OPTIONS", routePath, HandleMcpOptions(allowedOrigins));
+                                            routeBuilder.MapVerb("POST", routePath, HandleMcpPost(serviceConfig.Services, allowedHosts, allowedOrigins));
                                         }
                                     });
                                 });
@@ -398,7 +410,7 @@ public static class ServiceHandlerExtensions
         foreach (var description in descriptions)
             foreach (var operation in description.Operations)
             {
-                var attribute = MCPHelper.GetExposedToolAttribute(operation.Method);
+                var attribute = McpHelper.GetExposedToolAttribute(operation.Method);
                 if (attribute != null && !string.IsNullOrWhiteSpace(attribute.SubRoute))
                 {
                     var subRoute = attribute.SubRoute.Trim().ToLower();
@@ -408,7 +420,7 @@ public static class ServiceHandlerExtensions
             }
         return subRoutes;
     }
-    private static List<string> GetAllMCPRoutes(List<ServiceHandlerConfigurationInstance> services)
+    private static List<string> GetAllMcpRoutes(List<ServiceHandlerConfigurationInstance> services)
     {
         if (services == null || services.Count < 1) return [];
 
@@ -416,7 +428,7 @@ public static class ServiceHandlerExtensions
 
         foreach (var service in services)
         {
-            var route = service.MCPRouteBasePath.Trim().ToLower();
+            var route = service.McpRouteBasePath.Trim().ToLower();
             if (!string.IsNullOrWhiteSpace(route) && !routes.Contains(route))
                 routes.Add(route);
 
@@ -435,15 +447,44 @@ public static class ServiceHandlerExtensions
         return routes;
     }
 
-    private static Task HandleMCPGet(HttpRequest req, HttpResponse resp, RouteData route)
+    private static Func<HttpRequest, HttpResponse, RouteData, Task> HandleMcpGet(string[] allowedOrigins) => (req, resp, route) =>
     {
+        ApplyMcpCorsHeaders(req, resp, allowedOrigins);
         resp.StatusCode = StatusCodes.Status405MethodNotAllowed;
-        resp.Headers.Allow = "POST";
+        resp.Headers.Allow = "POST, OPTIONS";
         return Task.CompletedTask;
+    };
+
+    private static Func<HttpRequest, HttpResponse, RouteData, Task> HandleMcpOptions(string[] allowedOrigins) => (req, resp, route) =>
+    {
+        ApplyMcpCorsHeaders(req, resp, allowedOrigins);
+        resp.StatusCode = StatusCodes.Status204NoContent;
+        resp.Headers.Allow = "POST, OPTIONS";
+        return Task.CompletedTask;
+    };
+
+    private static void ApplyMcpCorsHeaders(HttpRequest req, HttpResponse resp, string[] allowedOrigins)
+    {
+        var origin = req.Headers.Origin.ToString();
+        if (!string.IsNullOrWhiteSpace(origin))
+        {
+            if (IsMcpOriginAllowed(origin, allowedOrigins))
+            {
+                resp.Headers.AccessControlAllowOrigin = origin;
+                resp.Headers.Vary = "Origin";
+            }
+        }
+        else if (allowedOrigins.Any(o => o == "*"))
+            resp.Headers.AccessControlAllowOrigin = "*";
+
+        resp.Headers.AccessControlAllowMethods = "POST, GET, OPTIONS";
+        resp.Headers.AccessControlAllowHeaders = "Content-Type, MCP-Session-Id";
+        resp.Headers.AccessControlExposeHeaders = "MCP-Session-Id, MCP-Protocol-Version";
     }
 
-    private static Func<HttpRequest, HttpResponse, RouteData, Task> HandleMCPPost(List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, string[] allowedHosts) => async (req, resp, route) =>
+    private static Func<HttpRequest, HttpResponse, RouteData, Task> HandleMcpPost(List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, string[] allowedHosts, string[] allowedOrigins) => async (req, resp, route) =>
     {
+        ApplyMcpCorsHeaders(req, resp, allowedOrigins);
         resp.ContentType = "application/json; charset=utf-8";
 
         if (!IsMcpHostAllowed(req.Host.Host, allowedHosts))
@@ -626,7 +667,7 @@ public static class ServiceHandlerExtensions
         var applicableConfigs = new List<ServiceHandlerConfigurationInstance>();
         foreach (var config in serviceInstanceConfigurations)
         {
-            var definedRoutePath = config.MCPRouteBasePath.Trim().ToLowerInvariant();
+            var definedRoutePath = config.McpRouteBasePath.Trim().ToLowerInvariant();
             if (!definedRoutePath.StartsWith('/')) definedRoutePath = $"/{definedRoutePath}";
             if (path.Equals(definedRoutePath, StringComparison.OrdinalIgnoreCase))
                 applicableConfigs.Add(config);
@@ -671,6 +712,23 @@ public static class ServiceHandlerExtensions
         return false;
     }
 
+    private static bool IsMcpOriginAllowed(string origin, string[] allowedOrigins)
+    {
+        if (string.IsNullOrWhiteSpace(origin))
+            return true;
+
+        foreach (var allowedOrigin in allowedOrigins)
+        {
+            if (allowedOrigin == "*")
+                return true;
+
+            if (string.Equals(origin, allowedOrigin, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
     private static async Task HandleMcpToolCall(HttpRequest request, HttpResponse response, JsonElement id, List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, JsonElement jsonRpcRequest)
     {
         if (!jsonRpcRequest.TryGetProperty("params", out var parameters) ||
@@ -686,7 +744,7 @@ public static class ServiceHandlerExtensions
         var requestedName = nameElement.GetString();
         var toolMatches = GetHostedServiceDescriptions(serviceInstanceConfigurations, discoverForMcpTools: true)
             .SelectMany(service => service.Operations.Select(operation => (Service: service, Operation: operation)))
-            .Where(candidate => MCPHelper.ToolNameMatchesPath(requestedName, requestPath, candidate.Service, candidate.Operation))
+            .Where(candidate => McpHelper.ToolNameMatchesPath(requestedName, requestPath, candidate.Service, candidate.Operation))
             .ToList();
 
         if (toolMatches.Count != 1)
@@ -870,11 +928,11 @@ public static class ServiceHandlerExtensions
         var serviceDescriptions = GetHostedServiceDescriptions(applicableServices, discoverForMcpTools: true, request: request);
         foreach (var serviceDescription in serviceDescriptions)
         {
-            var exposedPath = serviceDescription.Configuration.MCPRouteBasePath.Trim().ToLower();
+            var exposedPath = serviceDescription.Configuration.McpRouteBasePath.Trim().ToLower();
             foreach (var operation in serviceDescription.Operations)
             {
                 var operationExposedPath = exposedPath;
-                var exposedToolAttribute = MCPHelper.GetExposedToolAttribute(operation.Method);
+                var exposedToolAttribute = McpHelper.GetExposedToolAttribute(operation.Method);
                 if (!string.IsNullOrEmpty(exposedToolAttribute.SubRoute))
                     operationExposedPath = $"{operationExposedPath}/{exposedToolAttribute.SubRoute}".Replace("//", "/").ToLower();
 
@@ -882,7 +940,7 @@ public static class ServiceHandlerExtensions
                     continue;
 
                 writer.WriteStartObject();
-                writer.WriteString("name", MCPHelper.GetToolName(serviceDescription, operation));
+                writer.WriteString("name", McpHelper.GetToolName(serviceDescription, operation));
 
                 writer.WriteString("description", operation.Verbs[operation.Verbs.Keys.First()].Description);
 
@@ -976,7 +1034,7 @@ public static class ServiceHandlerExtensions
 
     private static ServiceOperationDescription GetOperationForMcpTool(Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles, ServiceHandlerConfigurationInstance serviceInstanceConfig, Type contractType, HostedServiceDescription serviceDescription, MethodInfo method, MethodInfo interfaceMethod)
     {
-        var exposedToolAttribute = MCPHelper.GetExposedToolAttribute(method);
+        var exposedToolAttribute = McpHelper.GetExposedToolAttribute(method);
         if (exposedToolAttribute == null) return null;
         if (!exposedToolAttribute.IsExposed) return null;
 
@@ -988,9 +1046,9 @@ public static class ServiceHandlerExtensions
             IsExposedMcpTool = true
         };
 
-        var description = MCPHelper.GetDescription(method, contractType, exposedToolAttribute, xmlDocumentationFiles);
+        var description = McpHelper.GetDescription(method, contractType, exposedToolAttribute, xmlDocumentationFiles);
         if (string.IsNullOrEmpty(description))
-            description = MCPHelper.GetDescription(interfaceMethod, contractType, exposedToolAttribute, xmlDocumentationFiles);
+            description = McpHelper.GetDescription(interfaceMethod, contractType, exposedToolAttribute, xmlDocumentationFiles);
         if (string.IsNullOrEmpty(description)) throw new Exception($"MCP tool description for method {interfaceMethod.Name} is required since AI needs it to know when to use the tool. Add an [ExposedTool(Description = ...] attribute, or a [Description] attribute, or a [Summary] attribute to the method or its parameters, or add XML documentation to the method.");
         operation.Verbs[operation.Verbs.Keys.First()].Description = description;
 
@@ -1002,7 +1060,7 @@ public static class ServiceHandlerExtensions
                 operation.ObsoleteReason = obsoleteAttribute.Message.Trim();
         }
 
-        MCPHelper.ExtractParameters(interfaceMethod, operation, xmlDocumentationFiles);
+        McpHelper.ExtractParameters(interfaceMethod, operation, xmlDocumentationFiles);
 
         return operation;
     }
