@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+	  <LangVersion>Latest</LangVersion>
+	  <Authors>Markus Egger Inc.</Authors>
+	  <Company>Markus Egger Inc.</Company>
+	  <Product>CODE Framework</Product>
+	  <PackageLicenseExpression>MIT</PackageLicenseExpression>
+	  <RepositoryUrl>https://github.com/MarkusEggerInc/CODEFrameworkCore</RepositoryUrl>
+	  <RepositoryType>Git</RepositoryType>
+	  <Copyright>Markus Egger Inc., 2017-2026</Copyright>
+	  <PackageIconUrl>http://www.codemag.com/Images/Logos/CodeFramework_Small.png</PackageIconUrl>
+	  <PackageIcon>CODEFrameworkLogoSmall.png</PackageIcon>
+	  <PackageProjectUrl>https://codeframework.io</PackageProjectUrl>
+	  <AssemblyVersion>2.1.1.0</AssemblyVersion>
+	  <FileVersion>2.1.1.0</FileVersion>
+	  <Version>2.1.1</Version>
+  </PropertyGroup>
+</Project>

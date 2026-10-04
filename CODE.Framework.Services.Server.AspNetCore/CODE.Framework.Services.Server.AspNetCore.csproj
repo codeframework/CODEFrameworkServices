@@ -2,21 +2,8 @@
 
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
-		<AssemblyVersion>2.1.0.0</AssemblyVersion>
-		<FileVersion>2.1.0.0</FileVersion>
-		<Version>2.1.0</Version>
-		<Authors>Markus Egger Inc.</Authors>
-		<Company>Markus Egger Inc.</Company>
-		<Product>CODE Framework</Product>
-		<Copyright>Markus Egger Inc., 2017-2023</Copyright>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<Description>ASP.NET Core specific service implementation for CODE Framework.</Description>
-		<PackageProjectUrl>https://codeframework.io</PackageProjectUrl>
-		<RepositoryUrl>https://github.com/MarkusEggerInc/CODEFrameworkCore</RepositoryUrl>
-		<PackageIconUrl>http://www.codemag.com/Images/Logos/CodeFramework_Small.png</PackageIconUrl>
-		<PackageIcon>CODEFrameworkLogoSmall.png</PackageIcon>
-		<RepositoryType>Git</RepositoryType>
-		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">

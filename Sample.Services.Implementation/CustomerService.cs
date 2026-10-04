@@ -22,10 +22,10 @@ public class CustomerService : ICustomerService, IServiceEvents
         {
             CustomerList =
             [
-                new Customer { Name = "Markus Egger", Company = "CODE" },
-                new Customer { Name = "Ellen Whitney", Company = "CODE" },
-                new Customer { Name = "Mike Yeager", Company = "CODE" },
-                new Customer { Name = "Otto Dobretsberger", Company = "CODE" }
+                new Customer { Name = "Markus Egger", Company = "CODE", Id = "1" },
+                new Customer { Name = "Ellen Whitney", Company = "CODE", Id = "2" },
+                new Customer { Name = "Mike Yeager", Company = "CODE", Id = "3" },
+                new Customer { Name = "Otto Dobretsberger", Company = "CODE", Id = "4" }
             ]
         };
 
@@ -41,10 +41,10 @@ public class CustomerService : ICustomerService, IServiceEvents
         {
             CustomerList =
             [
-                new Customer { Name = "Markus Egger", Company = "CODE" },
-                new Customer { Name = "Ellen Whitney", Company = "CODE" },
-                new Customer { Name = "Mike Yeager", Company = "CODE" },
-                new Customer { Name = "Otto Dobretsberger", Company = "CODE" }
+                new Customer { Name = "Markus Egger", Company = "CODE", Id = "1" },
+                new Customer { Name = "Ellen Whitney", Company = "CODE", Id = "2" },
+                new Customer { Name = "Mike Yeager", Company = "CODE", Id = "3" },
+                new Customer { Name = "Otto Dobretsberger", Company = "CODE", Id = "4" }
             ]
         };
 

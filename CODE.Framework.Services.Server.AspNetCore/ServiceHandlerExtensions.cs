@@ -139,13 +139,11 @@ public static class ServiceHandlerExtensions
                 // conditionally route to service handler based on RouteBasePath
                 appBuilder.MapWhen(
                                    context =>
-                                   {
-                                       var requestPath = context.Request.Path.ToString().ToLower();
-                                       if (SwaggerRoutes != null && SwaggerRoutes.Contains(requestPath)) return false; // We make sure we are not accidently eating up a configured swagger/openapi route
-                                       var servicePath = serviceInstanceConfig.RouteBasePath.ToLower();
-                                       var matched = requestPath == servicePath || requestPath.StartsWith(servicePath.Replace("//", "/") + "/");
-                                       return matched;
-                                   },
+                                    {
+                                        var requestPath = NormalizeRoutePath(context.Request.Path.ToString());
+                                        if (SwaggerRoutes != null && SwaggerRoutes.Contains(requestPath)) return false; // We make sure we are not accidently eating up a configured swagger/openapi route
+                                        return IsServiceRouteMatch(serviceInstanceConfig, requestPath);
+                                    },
                                    builder =>
                                    {
                                        //if (serviceConfig.Cors.UseCorsPolicy)
@@ -190,7 +188,7 @@ public static class ServiceHandlerExtensions
                                                    }
                                                }
 
-                                               if (relativeRoute.StartsWith("/")) relativeRoute = relativeRoute.Substring(1);
+                                               if (relativeRoute.StartsWith('/')) relativeRoute = relativeRoute.Substring(1);
 
                                                // Figure out the full route we pass the ASP.NET Core Route Manager
                                                var fullRoute = (serviceInstanceConfig.RouteBasePath + "/" + relativeRoute).Replace("//", "/");
@@ -217,6 +215,7 @@ public static class ServiceHandlerExtensions
                                                    await Task.CompletedTask;
                                                });
 
+                                               if (string.IsNullOrEmpty(fullRoute)) fullRoute = "/"; // If the route is empty, we have to use "/" as the route, otherwise it will not match anything";
                                                routeBuilder.MapVerb(restAttribute.Method.ToString(), fullRoute, exec);
                                            }
                                        });
@@ -224,6 +223,93 @@ public static class ServiceHandlerExtensions
         });
 
         return appBuilder;
+    }
+
+    private static bool IsServiceRouteMatch(ServiceHandlerConfigurationInstance serviceInstanceConfig, string requestPath)
+    {
+        var interfaces = serviceInstanceConfig.ServiceType.GetInterfaces();
+        if (interfaces.Length < 1)
+            throw new NotSupportedException(Resources.HostedServiceRequiresAnInterface);
+
+        foreach (var method in serviceInstanceConfig.ServiceType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.InvokeMethod | BindingFlags.DeclaredOnly))
+        {
+            var interfaceMethod = interfaces[0].GetMethod(method.Name);
+            if (interfaceMethod == null) continue;
+
+            var restAttribute = GetRestAttribute(interfaceMethod);
+            if (restAttribute == null) continue;
+
+            var fullRoute = GetServiceMethodFullRoute(serviceInstanceConfig, method, restAttribute);
+            if (IsRoutePathMatch(fullRoute, requestPath))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static string GetServiceMethodFullRoute(ServiceHandlerConfigurationInstance serviceInstanceConfig, MethodInfo method, RestAttribute restAttribute)
+    {
+        var relativeRoute = restAttribute.Route;
+        if (relativeRoute == null)
+        {
+            relativeRoute = restAttribute.Name ?? method.Name;
+
+            var parameters = method.GetParameters();
+            if (parameters.Length > 0)
+            {
+                var parameterType = parameters[0].ParameterType;
+                var parameterProperties = parameterType.GetProperties(BindingFlags.Instance | BindingFlags.Public);
+                var inlineParameters = GetSortedInlineParameterNames(parameterProperties);
+                foreach (var inlineParameter in inlineParameters)
+                    relativeRoute += $"/{{{inlineParameter}}}";
+            }
+        }
+
+        if (relativeRoute.StartsWith("/")) relativeRoute = relativeRoute[1..];
+
+        var fullRoute = (serviceInstanceConfig.RouteBasePath + "/" + relativeRoute).Replace("//", "/");
+        if (string.IsNullOrEmpty(fullRoute)) fullRoute = "/";
+
+        return NormalizeRoutePath(fullRoute);
+    }
+
+    private static bool IsRoutePathMatch(string routeTemplate, string requestPath)
+    {
+        if (routeTemplate == requestPath)
+            return true;
+
+        var routeSegments = routeTemplate.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var pathSegments = requestPath.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (routeSegments.Length != pathSegments.Length)
+            return false;
+
+        for (var segmentIndex = 0; segmentIndex < routeSegments.Length; segmentIndex++)
+        {
+            var routeSegment = routeSegments[segmentIndex];
+            if (routeSegment.StartsWith('{') && routeSegment.EndsWith('}'))
+                continue;
+
+            if (!routeSegment.Equals(pathSegments[segmentIndex], StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static string NormalizeRoutePath(string routePath)
+    {
+        var normalizedPath = string.IsNullOrWhiteSpace(routePath)
+            ? "/"
+            : routePath.Trim().Replace("//", "/");
+
+        if (!normalizedPath.StartsWith('/'))
+            normalizedPath = $"/{normalizedPath}";
+
+        if (normalizedPath.Length > 1 && normalizedPath.EndsWith('/'))
+            normalizedPath = normalizedPath[..^1];
+
+        return normalizedPath.ToLowerInvariant();
     }
 
     public static IApplicationBuilder UseMCPHandler(this IApplicationBuilder appBuilder, bool supportOpenApiJson = true)
@@ -304,20 +390,6 @@ public static class ServiceHandlerExtensions
 
         return appBuilder;
     }
-
-    //private static List<ServiceOperationDescription> GetToolsWithSubRoutes(List<ServiceHandlerConfigurationInstance> serviceConfigurations)
-    //{
-    //    var tools = new List<ServiceOperationDescription>();
-    //    var descriptions = GetHostedServiceDescriptions(serviceConfigurations, true);
-    //    foreach (var description in descriptions)
-    //        foreach (var operation in description.Operations)
-    //        {
-    //            var attribute = MCPHelper.GetExposedToolAttribute(operation.Method);
-    //            if (attribute != null && !string.IsNullOrWhiteSpace(attribute.SubRoute))
-    //                tools.Add(operation);
-    //        }
-    //    return tools;
-    //}
 
     private static List<string> GetSpecialToolSubRoutes(List<ServiceHandlerConfigurationInstance> serviceConfigurations)
     {
@@ -943,6 +1015,7 @@ public static class ServiceHandlerExtensions
         var httpVerb = restAttribute.Method.ToString().ToLowerInvariant();
         var definedRoute = restAttribute.Route != null ? restAttribute.Route : restAttribute.Name == null ? $"{method.Name}" : $"{restAttribute.Name}";
         var fullRoute = string.IsNullOrEmpty(definedRoute) ? $"{serviceInstanceConfig.RouteBasePath}" : $"{serviceInstanceConfig.RouteBasePath}/{definedRoute}";
+        if (string.IsNullOrEmpty(fullRoute)) fullRoute = "/";
 
         var operation = new ServiceOperationDescription(method.Name, httpVerb, method.Name, method)
         {
