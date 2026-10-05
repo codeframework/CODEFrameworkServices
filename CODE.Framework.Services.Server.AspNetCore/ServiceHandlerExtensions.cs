@@ -988,7 +988,7 @@ public static class ServiceHandlerExtensions
         await WriteMcpJsonRpcResult(response, id, writer =>
         {
             if (protocolVersion == "2026-07-28")
-                writer.WriteString("resultType", "text");
+                writer.WriteString("resultType", "complete");
             writer.WriteStartArray("content");
             writer.WriteStartObject();
             writer.WriteString("type", "text");
