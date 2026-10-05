@@ -919,10 +919,10 @@ public static class OpenApiHelper
             if (toolDescriptionAttribute2 != null && !string.IsNullOrEmpty(toolDescriptionAttribute2.Description))
                 return toolDescriptionAttribute2.Description.Trim();
 
-            var toolAttribute = implementationType.GetCustomAttributeEx<ToolAttribute>();
+            var toolAttribute = implementationType.GetCustomAttributeEx<AiToolAttribute>();
             if (toolAttribute != null && !string.IsNullOrEmpty(toolAttribute.Description))
                 return toolAttribute.Description.Trim();
-            var toolAttribute2 = interfaceType.GetCustomAttributeEx<ToolAttribute>();
+            var toolAttribute2 = interfaceType.GetCustomAttributeEx<AiToolAttribute>();
             if (toolAttribute2 != null && !string.IsNullOrEmpty(toolAttribute2.Description))
                 return toolAttribute2.Description.Trim();
         }

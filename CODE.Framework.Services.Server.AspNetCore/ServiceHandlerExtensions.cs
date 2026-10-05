@@ -410,7 +410,8 @@ public static class ServiceHandlerExtensions
         foreach (var description in descriptions)
             foreach (var operation in description.Operations)
             {
-                var attribute = McpHelper.GetExposedToolAttribute(operation.Method);
+                var interfaceMethod = description.ContractType?.GetMethod(operation.Method.Name);
+                var attribute = McpHelper.GetExposedAiToolAttribute(operation.Method, interfaceMethod);
                 if (attribute != null && !string.IsNullOrWhiteSpace(attribute.SubRoute))
                 {
                     var subRoute = attribute.SubRoute.Trim().ToLower();
@@ -589,12 +590,31 @@ public static class ServiceHandlerExtensions
 
             if (method == "tools/list")
             {
-                await WriteMcpJsonRpcResult(resp, id, writer =>
+                var protocolVersion = GetNegotiatedMcpProtocolVersion(req);
+
+                if (protocolVersion == "2025-11-25")
                 {
-                    writer.WriteStartArray("tools");
-                    WriteMcpTools(writer, serviceInstanceConfigurations, req);
-                    writer.WriteEndArray();
-                }, useEventStream);
+                    // 2025-11-25: ListToolsResult extends PaginatedResult (no caching fields)
+                    await WriteMcpJsonRpcResult(resp, id, writer =>
+                    {
+                        writer.WriteStartArray("tools");
+                        WriteMcpTools(writer, serviceInstanceConfigurations, req);
+                        writer.WriteEndArray();
+                    }, useEventStream);
+                }
+                else
+                {
+                    // 2026-07-28+: ListToolsResult extends PaginatedResult and CacheableResult (requires ttlMs, cacheControl)
+                    await WriteMcpJsonRpcResult(resp, id, writer =>
+                    {
+                        writer.WriteString("resultType", "complete");
+                        writer.WriteStartArray("tools");
+                        WriteMcpTools(writer, serviceInstanceConfigurations, req);
+                        writer.WriteEndArray();
+                        writer.WriteNumber("ttlMs", 300000); // 5 minutes
+                        writer.WriteString("cacheScope", "public");
+                    }, useEventStream);
+                }
                 return;
             }
 
@@ -611,71 +631,135 @@ public static class ServiceHandlerExtensions
             ? versionElement.GetString()
             : null;
 
-        var supportedProtocolVersions = new[] { "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05" };
+        var supportedVersions = new[] { "2026-07-28", "2025-11-25" };
         var protocolVersion = requestedVersion is null
-            ? supportedProtocolVersions[0]
-            : supportedProtocolVersions.Contains(requestedVersion)
+            ? supportedVersions[0]
+            : supportedVersions.Contains(requestedVersion)
                 ? requestedVersion
-                : supportedProtocolVersions[0];
+                : supportedVersions[0];
 
         resp.Headers["MCP-Protocol-Version"] = protocolVersion;
+
+        var applicableServiceConfigs = GetApplicableServiceConfigurations(serviceInstanceConfigurations, req);
+        string serverName;
+        string serverVersion;
+
+        if (applicableServiceConfigs == null || applicableServiceConfigs.Count < 1)
+        {
+            serverName = "CODE Framework Services";
+            serverVersion = typeof(ServiceHandlerExtensions).Assembly.GetName().Version?.ToString() ?? "1.0.0";
+        }
+        else
+        {
+            var displayNames = applicableServiceConfigs.Where(c => !string.IsNullOrEmpty(c.DisplayName)).Select(c => c.DisplayName).Distinct().OrderBy(d => d).ToList();
+            serverName = displayNames.Count == 1 ? displayNames[0] : string.Join(", ", displayNames);
+
+            var displayVersions = applicableServiceConfigs.Where(c => !string.IsNullOrEmpty(c.DisplayVersion)).Select(c => c.DisplayVersion).Distinct().OrderBy(v => v).ToList();
+            serverVersion = displayVersions.Count == 1 ? displayVersions[0] : string.Join(", ", displayVersions);
+        }
+
+        // Different response formats per protocol version
+        if (protocolVersion == "2025-11-25")
+            await WriteMcpInitializeResponse_2025_11_25(resp, id, serverName, serverVersion, useEventStream);
+        else
+            // 2026-07-28 and later
+            await WriteMcpInitializeResponse_2026_07_28(resp, id, supportedVersions, serverName, serverVersion, useEventStream);
+    }
+
+    private static async Task WriteMcpInitializeResponse_2025_11_25(HttpResponse resp, JsonElement id, string serverName, string serverVersion, bool useEventStream)
+    {
         await WriteMcpJsonRpcResult(resp, id, writer =>
         {
-            writer.WriteString("protocolVersion", protocolVersion);
+            writer.WriteString("protocolVersion", "2025-11-25");
+
             writer.WriteStartObject("capabilities");
             writer.WriteStartObject("tools");
             writer.WriteBoolean("listChanged", false);
             writer.WriteEndObject();
+            writer.WriteStartObject("resources");
             writer.WriteEndObject();
+            writer.WriteEndObject();
+
             writer.WriteStartObject("serverInfo");
-            var applicableServiceConfigs = GetApplicableServiceConfigurations(serviceInstanceConfigurations, req);
-            if (applicableServiceConfigs == null || applicableServiceConfigs.Count < 1)
-            {
-                writer.WriteString("name", "CODE Framework Services");
-                writer.WriteString("version", typeof(ServiceHandlerExtensions).Assembly.GetName().Version?.ToString() ?? "1.0.0");
-            }
-            else
-            {
-                var displayNames = applicableServiceConfigs.Where(c => !string.IsNullOrEmpty(c.DisplayName)).Select(c => c.DisplayName).Distinct().OrderBy(d => d).ToList();
-                var displayName = displayNames.Count == 1 ? displayNames[0] : string.Join(", ", displayNames);
+            writer.WriteString("name", serverName);
+            writer.WriteString("version", serverVersion);
+            writer.WriteEndObject();
+        }, useEventStream);
+    }
 
-                var displayVersions = applicableServiceConfigs.Where(c => !string.IsNullOrEmpty(c.DisplayVersion)).Select(c => c.DisplayVersion).Distinct().OrderBy(v => v).ToList();
-                var displayVersion = displayVersions.Count == 1 ? displayVersions[0] : string.Join(", ", displayVersions);
+    private static async Task WriteMcpInitializeResponse_2026_07_28(HttpResponse resp, JsonElement id, string[] supportedVersions, string serverName, string serverVersion, bool useEventStream)
+    {
+        await WriteMcpJsonRpcResult(resp, id, writer =>
+        {
+            writer.WriteString("resultType", "complete");
+            writer.WriteStartArray("supportedVersions");
+            foreach (var version in supportedVersions)
+                writer.WriteStringValue(version);
+            writer.WriteEndArray();
 
-                writer.WriteString("name", !string.IsNullOrEmpty(displayName) ? displayName : "CODE Framework Services");
-                writer.WriteString("version", !string.IsNullOrEmpty(displayVersion) ? displayVersion : "1.0.0");
-            }
+            writer.WriteStartObject("capabilities");
+            writer.WriteStartObject("tools");
+            writer.WriteBoolean("listChanged", false);
+            writer.WriteEndObject();
+            writer.WriteStartObject("resources");
+            writer.WriteEndObject();
+            writer.WriteEndObject();
+
+            writer.WriteStartObject("_meta");
+            writer.WriteStartObject("io.modelcontextprotocol/serverInfo");
+            writer.WriteString("name", serverName);
+            writer.WriteString("version", serverVersion);
+            writer.WriteEndObject();
             writer.WriteEndObject();
         }, useEventStream);
     }
 
     private static async Task WriteMcpDiscoverResponse(List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, HttpRequest req, HttpResponse resp, JsonElement id, bool useEventStream)
     {
+        var supportedVersions = new[] { "2026-07-28", "2025-11-25" };
+
         var applicableServiceConfigs = GetApplicableServiceConfigurations(serviceInstanceConfigurations, req);
+
+        // Determine server info based on applicable configs
+        string serverName;
+        string serverVersion;
+
         if (applicableServiceConfigs == null || applicableServiceConfigs.Count < 1)
-            // We do not really have anything, but at least we do not want to fail
-            await WriteMcpJsonRpcResult(resp, id, writer =>
-            {
-                writer.WriteStartObject("server");
-                writer.WriteString("name", "CODE Framework Services");
-                writer.WriteString("version", typeof(ServiceHandlerExtensions).Assembly.GetName().Version?.ToString() ?? "1.0.0");
-                writer.WriteEndObject();
-            }, useEventStream);
+        {
+            serverName = "CODE Framework Services";
+            serverVersion = typeof(ServiceHandlerExtensions).Assembly.GetName().Version?.ToString() ?? "1.0.0";
+        }
         else
-            // We have configured services, so we figure out which one to use
-            await WriteMcpJsonRpcResult(resp, id, writer =>
-            {
-                var displayNames = applicableServiceConfigs.Where(c => !string.IsNullOrEmpty(c.DisplayName)).Select(c => c.DisplayName).Distinct().OrderBy(d => d).ToList();
-                var displayName = displayNames.Count == 1 ? displayNames[0] : string.Join(", ", displayNames);
+        {
+            var displayNames = applicableServiceConfigs.Where(c => !string.IsNullOrEmpty(c.DisplayName)).Select(c => c.DisplayName).Distinct().OrderBy(d => d).ToList();
+            serverName = displayNames.Count == 1 ? displayNames[0] : string.Join(", ", displayNames);
 
-                var displayVersions = applicableServiceConfigs.Where(c => !string.IsNullOrEmpty(c.DisplayVersion)).Select(c => c.DisplayVersion).Distinct().OrderBy(v => v).ToList();
-                var displayVersion = displayVersions.Count == 1 ? displayVersions[0] : string.Join(", ", displayVersions);
+            var displayVersions = applicableServiceConfigs.Where(c => !string.IsNullOrEmpty(c.DisplayVersion)).Select(c => c.DisplayVersion).Distinct().OrderBy(v => v).ToList();
+            serverVersion = displayVersions.Count == 1 ? displayVersions[0] : string.Join(", ", displayVersions);
+        }
 
-                writer.WriteStartObject("server");
-                writer.WriteString("name", displayName);
-                writer.WriteString("version", displayVersion);
-                writer.WriteEndObject();
-            }, useEventStream);
+        await WriteMcpJsonRpcResult(resp, id, writer =>
+        {
+            writer.WriteString("resultType", "complete");
+            writer.WriteStartArray("supportedVersions");
+            foreach (var version in supportedVersions)
+                writer.WriteStringValue(version);
+            writer.WriteEndArray();
+
+            writer.WriteStartObject("capabilities");
+            writer.WriteStartObject("tools");
+            writer.WriteEndObject();
+            writer.WriteStartObject("resources");
+            writer.WriteEndObject();
+            writer.WriteEndObject();
+
+            writer.WriteStartObject("_meta");
+            writer.WriteStartObject("io.modelcontextprotocol/serverInfo");
+            writer.WriteString("name", serverName);
+            writer.WriteString("version", serverVersion);
+            writer.WriteEndObject();
+            writer.WriteEndObject();
+        }, useEventStream);
     }
 
     private static List<ServiceHandlerConfigurationInstance> GetApplicableServiceConfigurations(List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, HttpRequest req)
@@ -749,8 +833,23 @@ public static class ServiceHandlerExtensions
         return false;
     }
 
+    private static string GetNegotiatedMcpProtocolVersion(HttpRequest request, string defaultVersion = "2026-07-28")
+    {
+        // Extract protocol version from request header (set by client after initialize negotiation)
+        if (request.Headers.TryGetValue("MCP-Protocol-Version", out var versionHeader))
+        {
+            var headerVersion = versionHeader.FirstOrDefault();
+            if (!string.IsNullOrEmpty(headerVersion) && (headerVersion == "2025-11-25" || headerVersion == "2026-07-28"))
+                return headerVersion;
+        }
+
+        return defaultVersion;
+    }
+
     private static async Task HandleMcpToolCall(HttpRequest request, HttpResponse response, JsonElement id, List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, JsonElement jsonRpcRequest, bool useEventStream)
     {
+        var protocolVersion = GetNegotiatedMcpProtocolVersion(request);
+
         if (!jsonRpcRequest.TryGetProperty("params", out var parameters) ||
             parameters.ValueKind != JsonValueKind.Object ||
             !parameters.TryGetProperty("name", out var nameElement) ||
@@ -888,6 +987,8 @@ public static class ServiceHandlerExtensions
 
         await WriteMcpJsonRpcResult(response, id, writer =>
         {
+            if (protocolVersion == "2026-07-28")
+                writer.WriteString("resultType", "text");
             writer.WriteStartArray("content");
             writer.WriteStartObject();
             writer.WriteString("type", "text");
@@ -952,18 +1053,17 @@ public static class ServiceHandlerExtensions
             foreach (var operation in serviceDescription.Operations)
             {
                 var operationExposedPath = exposedPath;
-                var exposedToolAttribute = McpHelper.GetExposedToolAttribute(operation.Method);
+                var interfaceMethod = serviceDescription.ContractType?.GetMethod(operation.Method.Name);
+                var exposedToolAttribute = McpHelper.GetExposedAiToolAttribute(operation.Method, interfaceMethod);
                 if (!string.IsNullOrEmpty(exposedToolAttribute.SubRoute))
                     operationExposedPath = $"{operationExposedPath}/{exposedToolAttribute.SubRoute}".Replace("//", "/").ToLower();
 
-                if (!request.Path.Equals(operationExposedPath))
-                    continue;
+                if (!request.Path.Equals(operationExposedPath)) continue;
 
                 writer.WriteStartObject();
                 writer.WriteString("name", McpHelper.GetToolName(serviceDescription, operation));
-
+                writer.WriteString("title", McpHelper.GetToolTitle(serviceDescription, operation));
                 writer.WriteString("description", operation.Verbs[operation.Verbs.Keys.First()].Description);
-
                 writer.WritePropertyName("inputSchema");
                 WriteMcpSchema(writer, operation.InputSchema);
                 writer.WriteEndObject();
@@ -1012,15 +1112,15 @@ public static class ServiceHandlerExtensions
 
         if (useEventStream)
         {
-            await using var memoryStream = new System.IO.MemoryStream();
+            await using MemoryStream memoryStream = new System.IO.MemoryStream();
             await using (var writer = new Utf8JsonWriter(memoryStream))
             {
                 writeMessage(writer);
                 await writer.FlushAsync();
             }
 
-            var payload = System.Text.Encoding.UTF8.GetString(memoryStream.ToArray());
-            await response.WriteAsync($"data: {payload}\n\n");
+            var payload = Encoding.UTF8.GetString(memoryStream.ToArray());
+            await response.WriteAsync($"data: {payload}{Environment.NewLine}{Environment.NewLine}");
             await response.Body.FlushAsync();
             return;
         }
@@ -1079,7 +1179,7 @@ public static class ServiceHandlerExtensions
 
     private static ServiceOperationDescription GetOperationForMcpTool(Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles, ServiceHandlerConfigurationInstance serviceInstanceConfig, Type contractType, HostedServiceDescription serviceDescription, MethodInfo method, MethodInfo interfaceMethod)
     {
-        var exposedToolAttribute = McpHelper.GetExposedToolAttribute(method);
+        var exposedToolAttribute = McpHelper.GetExposedAiToolAttribute(method, interfaceMethod);
         if (exposedToolAttribute == null) return null;
         if (!exposedToolAttribute.IsExposed) return null;
 

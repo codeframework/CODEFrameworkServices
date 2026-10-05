@@ -14,7 +14,6 @@ public class CustomerService : ICustomerService, IServiceEvents
         SecondDateReturned = request.SecondDate
     };
 
-    [Tool]
     public GetCustomersResponse GetCustomers(GetCustomersRequest request)
     {
         // Real code goes here...
@@ -62,7 +61,7 @@ public class CustomerService : ICustomerService, IServiceEvents
         };
     }
 
-    [Tool(Name = "SearchCustomers", Description = "Returns customers based on the provided search string (inactive customers can optionally be included).")]
+    [AiTool(Name = "SearchCustomers", Description = "Returns customers based on the provided search string (inactive customers can optionally be included).")]
     public SearchTestResponse SearchTest(SearchTestRequest request)
     {
         var response = new SearchTestResponse
@@ -82,7 +81,7 @@ public class CustomerService : ICustomerService, IServiceEvents
         return response;
     }
 
-    [Tool(Description = "Returns a customer based on the provided customer ID.")]
+    [AiTool(Description = "Returns a customer based on the provided customer ID.")]
     public GetCustomerResponse GetCustomer(GetCustomerRequest request) => new()
     {
         Customer = new Customer 
@@ -93,7 +92,7 @@ public class CustomerService : ICustomerService, IServiceEvents
         }
     };
 
-    [Tool(SubRoute = "Photos"), Description("Returns a photo (the actual bytes) based on the provided customer ID.")]
+    [AiTool(SubRoute = "Photos"), Description("Returns a photo (the actual bytes) based on the provided customer ID.")]
     public FileResponse GetPhoto(GetPhotoRequest request) => new()
     {
         ContentType = "image/png",

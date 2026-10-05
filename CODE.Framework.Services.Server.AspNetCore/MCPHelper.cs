@@ -4,7 +4,7 @@ namespace CODE.Framework.Services.Server.AspNetCore;
 
 public static class McpHelper
 {
-    public static string GetDescription(MethodInfo interfaceMethod, Type methodInterface, ToolAttribute exposedToolAttribute, Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles)
+    public static string GetDescription(MethodInfo interfaceMethod, Type methodInterface, AiToolAttribute exposedToolAttribute, Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles)
     {
         if (exposedToolAttribute != null && !string.IsNullOrEmpty(exposedToolAttribute.Description))
             return exposedToolAttribute.Description.Trim();
@@ -52,16 +52,29 @@ public static class McpHelper
     }
 
     /// <summary>
-    /// Extracts the ExposedToolAttribute from a propertyInfo's attributes
+    /// Extracts the AiToolAttribute from a method's attributes. 
+    /// Checks both the implementation method and the interface method (if provided),
+    /// since attributes applied to interface methods don't automatically inherit to implementation methods.
     /// </summary>
-    /// <param name="method"></param>
-    /// <param name="method">The method-info to be inspected</param>
-    /// <returns>The applied ExposedToolAttribute or a default ExposedToolAttribute.</returns>
-    public static ToolAttribute GetExposedToolAttribute(MethodInfo method)
+    /// <param name="method">The implementation method to inspect</param>
+    /// <param name="interfaceMethod">Optional interface method to check for inherited attributes</param>
+    /// <returns>The applied AiToolAttribute or null if not found</returns>
+    public static AiToolAttribute GetExposedAiToolAttribute(MethodInfo method, MethodInfo interfaceMethod = null)
     {
-        var customAttributes = method.GetCustomAttributes(typeof(ToolAttribute), true);
-        if (customAttributes.Length <= 0) return null;
-        return customAttributes[0] as ToolAttribute;
+        // First check the implementation method itself
+        var customAttributes = method.GetCustomAttributes(typeof(AiToolAttribute), true);
+        if (customAttributes.Length > 0)
+            return customAttributes[0] as AiToolAttribute;
+
+        // If not found on implementation and interface method is provided, check the interface method
+        if (interfaceMethod != null)
+        {
+            var interfaceAttributes = interfaceMethod.GetCustomAttributes(typeof(AiToolAttribute), true);
+            if (interfaceAttributes.Length > 0)
+                return interfaceAttributes[0] as AiToolAttribute;
+        }
+
+        return null;
     }
 
     public static void ExtractParameters(MethodInfo methodInfo, OpenApiPathInfo pathInfo, Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles)
@@ -120,7 +133,8 @@ public static class McpHelper
     {
         var toolName = $"{serviceDescription.ContractType.Name}_{operation.Name}";
 
-        var exposedToolAttribute = GetExposedToolAttribute(operation.Method);
+        var interfaceMethod = serviceDescription.ContractType?.GetMethod(operation.Method.Name);
+        var exposedToolAttribute = GetExposedAiToolAttribute(operation.Method, interfaceMethod);
         if (exposedToolAttribute != null && !string.IsNullOrEmpty(exposedToolAttribute.Name))
             toolName = exposedToolAttribute.Name;
 
@@ -132,6 +146,40 @@ public static class McpHelper
         return toolName;
     }
 
+    public static string GetToolTitle(HostedServiceDescription serviceDescription, ServiceOperationDescription operation)
+    {
+        if (!string.IsNullOrEmpty(operation.Title)) return operation.Title; 
+
+        var title = string.Empty;
+
+        var interfaceMethod = serviceDescription.ContractType?.GetMethod(operation.Method.Name);
+        var exposedToolAttribute = GetExposedAiToolAttribute(operation.Method, interfaceMethod);
+        if (exposedToolAttribute != null && !string.IsNullOrEmpty(exposedToolAttribute.Title))
+            title = exposedToolAttribute.Title;
+
+        if (string.IsNullOrEmpty(title))
+        {
+            var toolName = GetToolName(serviceDescription, operation);
+            if (!string.IsNullOrEmpty(toolName))
+            {
+                if (toolName.Length > 1 && toolName.Substring(0, 1) == "I" && toolName.Substring(1, 1) == toolName.Substring(1, 1).ToUpper())
+                    toolName = toolName.Substring(1);
+                toolName = toolName.Replace("_", " ");
+                toolName = toolName.Replace("  ", " ");
+                toolName = toolName.Replace("  ", " ");
+                title = StringHelper.SpaceCamelCase(toolName);
+            }
+        }
+
+        title = title.Replace("  ", " ");
+        title = title.Replace("  ", " ");
+
+        if (string.IsNullOrEmpty(operation.Title))
+            operation.Title = title;
+
+        return title;
+    }
+
     public static bool ToolNameMatchesPath(string toolName, string path, HostedServiceDescription serviceDescription, ServiceOperationDescription operation)
     {
         var toolExposedName = GetToolName(serviceDescription, operation);
@@ -141,7 +189,8 @@ public static class McpHelper
         if (!toolName.Equals(toolExposedName, StringComparison.OrdinalIgnoreCase)) return false;
 
         // The tool name is a match, but are we on the right route?
-        var exposedToolAttribute = GetExposedToolAttribute(operation.Method);
+        var interfaceMethod = serviceDescription.ContractType?.GetMethod(operation.Method.Name);
+        var exposedToolAttribute = GetExposedAiToolAttribute(operation.Method, interfaceMethod);
         var fullRoute = serviceDescription.Configuration.McpRouteBasePath;
         if (!string.IsNullOrEmpty(exposedToolAttribute.SubRoute))
             fullRoute = $"{fullRoute}/{exposedToolAttribute.SubRoute}".Replace("//", "/");

@@ -37,6 +37,7 @@ public interface ICustomerService
     /// <returns>A response with a list of customers</returns>
     [OperationContract, Rest(Method = RestMethods.Get, Name = "")]
     [Description("Returns a list of all customers.")]
+    [AiTool(Title = "Get Customers")]
     GetCustomersResponse GetCustomers(GetCustomersRequest request);
 
     /// <summary>

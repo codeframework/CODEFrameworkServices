@@ -35,7 +35,7 @@ public class ToolDescriptionAttribute(string description) : Attribute
 /// Indicates whether a tool is exposed in MCP
 /// </summary>
 [AttributeUsage(AttributeTargets.Method, Inherited = true)]
-public class ToolAttribute() : Attribute
+public class AiToolAttribute() : Attribute
 {
     /// <summary>
     /// Indicates whether the tool is exposed in MCP
