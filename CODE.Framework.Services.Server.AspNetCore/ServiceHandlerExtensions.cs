@@ -478,7 +478,12 @@ public static class ServiceHandlerExtensions
             resp.Headers.AccessControlAllowOrigin = "*";
 
         resp.Headers.AccessControlAllowMethods = "POST, GET, OPTIONS";
-        resp.Headers.AccessControlAllowHeaders = "Content-Type, MCP-Session-Id";
+
+        var requestedHeaders = req.Headers.AccessControlRequestHeaders.ToString();
+        resp.Headers.AccessControlAllowHeaders = !string.IsNullOrWhiteSpace(requestedHeaders)
+            ? requestedHeaders
+            : "Content-Type, Authorization, Accept, MCP-Session-Id, MCP-Protocol-Version";
+
         resp.Headers.AccessControlExposeHeaders = "MCP-Session-Id, MCP-Protocol-Version";
     }
 

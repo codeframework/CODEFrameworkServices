@@ -898,9 +898,9 @@ public static class OpenApiHelper
         if (componentModelDescriptionAttribute != null && !string.IsNullOrEmpty(componentModelDescriptionAttribute.Description))
             return componentModelDescriptionAttribute.Description.Trim();
 
-        if (xmlDocumentationFiles.ContainsKey(type.Assembly))
+        if (xmlDocumentationFiles.TryGetValue(type.Assembly, out XmlCodeDocumentationFile value))
         {
-            var xmlDescription = xmlDocumentationFiles[type.Assembly].GetDescriptionFromXmlDocs(type);
+            var xmlDescription = value.GetDescriptionFromXmlDocs(type);
             if (!string.IsNullOrEmpty(xmlDescription))
                 return xmlDescription;
         }
@@ -918,6 +918,13 @@ public static class OpenApiHelper
             var toolDescriptionAttribute2 = interfaceType.GetCustomAttributeEx<ToolDescriptionAttribute>();
             if (toolDescriptionAttribute2 != null && !string.IsNullOrEmpty(toolDescriptionAttribute2.Description))
                 return toolDescriptionAttribute2.Description.Trim();
+
+            var toolAttribute = implementationType.GetCustomAttributeEx<ToolAttribute>();
+            if (toolAttribute != null && !string.IsNullOrEmpty(toolAttribute.Description))
+                return toolAttribute.Description.Trim();
+            var toolAttribute2 = interfaceType.GetCustomAttributeEx<ToolAttribute>();
+            if (toolAttribute2 != null && !string.IsNullOrEmpty(toolAttribute2.Description))
+                return toolAttribute2.Description.Trim();
         }
 
         var descriptionAttribute = implementationType.GetCustomAttributeEx<DescriptionAttribute>();

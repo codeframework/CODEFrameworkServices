@@ -4,7 +4,7 @@ namespace CODE.Framework.Services.Server.AspNetCore;
 
 public static class McpHelper
 {
-    public static string GetDescription(MethodInfo interfaceMethod, Type methodInterface, ExposedToolAttribute exposedToolAttribute, Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles)
+    public static string GetDescription(MethodInfo interfaceMethod, Type methodInterface, ToolAttribute exposedToolAttribute, Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles)
     {
         if (exposedToolAttribute != null && !string.IsNullOrEmpty(exposedToolAttribute.Description))
             return exposedToolAttribute.Description.Trim();
@@ -57,11 +57,11 @@ public static class McpHelper
     /// <param name="method"></param>
     /// <param name="method">The method-info to be inspected</param>
     /// <returns>The applied ExposedToolAttribute or a default ExposedToolAttribute.</returns>
-    public static ExposedToolAttribute GetExposedToolAttribute(MethodInfo method)
+    public static ToolAttribute GetExposedToolAttribute(MethodInfo method)
     {
-        var customAttributes = method.GetCustomAttributes(typeof(ExposedToolAttribute), true);
+        var customAttributes = method.GetCustomAttributes(typeof(ToolAttribute), true);
         if (customAttributes.Length <= 0) return null;
-        return customAttributes[0] as ExposedToolAttribute;
+        return customAttributes[0] as ToolAttribute;
     }
 
     public static void ExtractParameters(MethodInfo methodInfo, OpenApiPathInfo pathInfo, Dictionary<Assembly, XmlCodeDocumentationFile> xmlDocumentationFiles)
