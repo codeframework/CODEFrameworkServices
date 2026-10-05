@@ -487,10 +487,25 @@ public static class ServiceHandlerExtensions
         resp.Headers.AccessControlExposeHeaders = "MCP-Session-Id, MCP-Protocol-Version";
     }
 
+    private static bool ClientRequestsMcpEventStream(HttpRequest request) => request.Headers.Accept.ToString().Contains("text/event-stream", StringComparison.OrdinalIgnoreCase);
+
+    private static void ApplyMcpResponseContentType(HttpResponse response, bool useEventStream)
+    {
+        if (useEventStream)
+        {
+            response.ContentType = "text/event-stream; charset=utf-8";
+            response.Headers.CacheControl = "no-cache";
+            response.Headers["X-Accel-Buffering"] = "no";
+        }
+        else
+            response.ContentType = "application/json; charset=utf-8";
+    }
+
     private static Func<HttpRequest, HttpResponse, RouteData, Task> HandleMcpPost(List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, string[] allowedHosts, string[] allowedOrigins) => async (req, resp, route) =>
     {
         ApplyMcpCorsHeaders(req, resp, allowedOrigins);
-        resp.ContentType = "application/json; charset=utf-8";
+        var useEventStream = ClientRequestsMcpEventStream(req);
+        ApplyMcpResponseContentType(resp, useEventStream);
 
         if (!IsMcpHostAllowed(req.Host.Host, allowedHosts))
         {
@@ -505,7 +520,7 @@ public static class ServiceHandlerExtensions
         }
         catch (JsonException)
         {
-            await WriteMcpJsonRpcError(resp, null, -32700, "Parse error");
+            await WriteMcpJsonRpcError(resp, null, -32700, "Parse error", useEventStream);
             return;
         }
 
@@ -522,14 +537,14 @@ public static class ServiceHandlerExtensions
                 JsonElement? invalidId = request.ValueKind == JsonValueKind.Object && request.TryGetProperty("id", out var idElement)
                     ? idElement
                     : null;
-                await WriteMcpJsonRpcError(resp, invalidId, -32600, "Invalid Request");
+                await WriteMcpJsonRpcError(resp, invalidId, -32600, "Invalid Request", useEventStream);
                 return;
             }
 
             var hasId = request.TryGetProperty("id", out var id);
             if (hasId && id.ValueKind is not (JsonValueKind.String or JsonValueKind.Number or JsonValueKind.Null))
             {
-                await WriteMcpJsonRpcError(resp, id, -32600, "Invalid Request");
+                await WriteMcpJsonRpcError(resp, id, -32600, "Invalid Request", useEventStream);
                 return;
             }
 
@@ -550,25 +565,25 @@ public static class ServiceHandlerExtensions
 
             if (method == "tools/call")
             {
-                await HandleMcpToolCall(req, resp, id, serviceInstanceConfigurations, request);
+                await HandleMcpToolCall(req, resp, id, serviceInstanceConfigurations, request, useEventStream);
                 return;
             }
 
             if (method == "initialize")
             {
-                await WriteMcpInitializeResponse(serviceInstanceConfigurations, req, resp, request, id);
+                await WriteMcpInitializeResponse(serviceInstanceConfigurations, req, resp, request, id, useEventStream);
                 return;
             }
 
             if (method == "ping")
             {
-                await WriteMcpJsonRpcResult(resp, id, _ => { });
+                await WriteMcpJsonRpcResult(resp, id, _ => { }, useEventStream);
                 return;
             }
 
             if (method == "server/discover")
             {
-                await WriteMcpDiscoverResponse(serviceInstanceConfigurations, req, resp, id);
+                await WriteMcpDiscoverResponse(serviceInstanceConfigurations, req, resp, id, useEventStream);
                 return;
             }
 
@@ -579,15 +594,15 @@ public static class ServiceHandlerExtensions
                     writer.WriteStartArray("tools");
                     WriteMcpTools(writer, serviceInstanceConfigurations, req);
                     writer.WriteEndArray();
-                });
+                }, useEventStream);
                 return;
             }
 
-            await WriteMcpJsonRpcError(resp, id, -32601, $"Method not found: {method}");
+            await WriteMcpJsonRpcError(resp, id, -32601, $"Method not found: {method}", useEventStream);
         }
     };
 
-    private static async Task WriteMcpInitializeResponse(List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, HttpRequest req, HttpResponse resp, JsonElement request, JsonElement id)
+    private static async Task WriteMcpInitializeResponse(List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, HttpRequest req, HttpResponse resp, JsonElement request, JsonElement id, bool useEventStream)
     {
         var requestedVersion = request.TryGetProperty("params", out var initializeParams) &&
                                initializeParams.ValueKind == JsonValueKind.Object &&
@@ -631,10 +646,10 @@ public static class ServiceHandlerExtensions
                 writer.WriteString("version", !string.IsNullOrEmpty(displayVersion) ? displayVersion : "1.0.0");
             }
             writer.WriteEndObject();
-        });
+        }, useEventStream);
     }
 
-    private static async Task WriteMcpDiscoverResponse(List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, HttpRequest req, HttpResponse resp, JsonElement id)
+    private static async Task WriteMcpDiscoverResponse(List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, HttpRequest req, HttpResponse resp, JsonElement id, bool useEventStream)
     {
         var applicableServiceConfigs = GetApplicableServiceConfigurations(serviceInstanceConfigurations, req);
         if (applicableServiceConfigs == null || applicableServiceConfigs.Count < 1)
@@ -645,7 +660,7 @@ public static class ServiceHandlerExtensions
                 writer.WriteString("name", "CODE Framework Services");
                 writer.WriteString("version", typeof(ServiceHandlerExtensions).Assembly.GetName().Version?.ToString() ?? "1.0.0");
                 writer.WriteEndObject();
-            });
+            }, useEventStream);
         else
             // We have configured services, so we figure out which one to use
             await WriteMcpJsonRpcResult(resp, id, writer =>
@@ -660,7 +675,7 @@ public static class ServiceHandlerExtensions
                 writer.WriteString("name", displayName);
                 writer.WriteString("version", displayVersion);
                 writer.WriteEndObject();
-            });
+            }, useEventStream);
     }
 
     private static List<ServiceHandlerConfigurationInstance> GetApplicableServiceConfigurations(List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, HttpRequest req)
@@ -734,14 +749,14 @@ public static class ServiceHandlerExtensions
         return false;
     }
 
-    private static async Task HandleMcpToolCall(HttpRequest request, HttpResponse response, JsonElement id, List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, JsonElement jsonRpcRequest)
+    private static async Task HandleMcpToolCall(HttpRequest request, HttpResponse response, JsonElement id, List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, JsonElement jsonRpcRequest, bool useEventStream)
     {
         if (!jsonRpcRequest.TryGetProperty("params", out var parameters) ||
             parameters.ValueKind != JsonValueKind.Object ||
             !parameters.TryGetProperty("name", out var nameElement) ||
             nameElement.ValueKind != JsonValueKind.String)
         {
-            await WriteMcpJsonRpcError(response, id, -32602, "Invalid tools/call parameters.");
+            await WriteMcpJsonRpcError(response, id, -32602, "Invalid tools/call parameters.", useEventStream);
             return;
         }
 
@@ -755,7 +770,7 @@ public static class ServiceHandlerExtensions
         if (toolMatches.Count != 1)
         {
             await WriteMcpJsonRpcError(response, id, -32602,
-                toolMatches.Count == 0 ? $"Unknown tool: {requestedName}" : $"Tool name is ambiguous: {requestedName}");
+                toolMatches.Count == 0 ? $"Unknown tool: {requestedName}" : $"Tool name is ambiguous: {requestedName}", useEventStream);
             return;
         }
 
@@ -765,7 +780,7 @@ public static class ServiceHandlerExtensions
         var methodParameters = operation.Method.GetParameters();
         if (methodParameters.Length > 1)
         {
-            await WriteMcpJsonRpcError(response, id, -32602, "MCP tools may have at most one input parameter.");
+            await WriteMcpJsonRpcError(response, id, -32602, "MCP tools may have at most one input parameter.", useEventStream);
             return;
         }
 
@@ -774,7 +789,7 @@ public static class ServiceHandlerExtensions
         {
             if (argumentsElement.ValueKind != JsonValueKind.Object)
             {
-                await WriteMcpJsonRpcError(response, id, -32602, "Tool arguments must be a JSON object.");
+                await WriteMcpJsonRpcError(response, id, -32602, "Tool arguments must be a JSON object.", useEventStream);
                 return;
             }
             arguments = argumentsElement;
@@ -791,7 +806,7 @@ public static class ServiceHandlerExtensions
             {
                 if (arguments.ValueKind == JsonValueKind.Object && arguments.EnumerateObject().Any())
                 {
-                    await WriteMcpJsonRpcError(response, id, -32602, "This tool does not accept arguments.");
+                    await WriteMcpJsonRpcError(response, id, -32602, "This tool does not accept arguments.", useEventStream);
                     return;
                 }
                 invocationArguments = [];
@@ -802,7 +817,7 @@ public static class ServiceHandlerExtensions
                 var argument = JsonSerializer.Deserialize(argumentJson, methodParameters[0].ParameterType, serializerOptions);
                 if (argument == null)
                 {
-                    await WriteMcpJsonRpcError(response, id, -32602, "Tool arguments could not be deserialized.");
+                    await WriteMcpJsonRpcError(response, id, -32602, "Tool arguments could not be deserialized.", useEventStream);
                     return;
                 }
                 invocationArguments = [argument];
@@ -810,7 +825,7 @@ public static class ServiceHandlerExtensions
         }
         catch (JsonException)
         {
-            await WriteMcpJsonRpcError(response, id, -32602, "Tool arguments do not match the expected input schema.");
+            await WriteMcpJsonRpcError(response, id, -32602, "Tool arguments do not match the expected input schema.", useEventStream);
             return;
         }
 
@@ -880,7 +895,7 @@ public static class ServiceHandlerExtensions
             writer.WriteEndObject();
             writer.WriteEndArray();
             writer.WriteBoolean("isError", executionError != null);
-        });
+        }, useEventStream);
     }
 
     private static void ValidateMcpToolRoles(IReadOnlyCollection<string> authorizationRoles, IPrincipal user)
@@ -956,38 +971,63 @@ public static class ServiceHandlerExtensions
         }
     }
 
-    private static async Task WriteMcpJsonRpcResult(HttpResponse response, JsonElement id, Action<Utf8JsonWriter> writeResult)
+    private static async Task WriteMcpJsonRpcResult(HttpResponse response, JsonElement id, Action<Utf8JsonWriter> writeResult, bool useEventStream = false)
     {
-        await using var writer = new Utf8JsonWriter(response.Body);
-        writer.WriteStartObject();
-        writer.WriteString("jsonrpc", "2.0");
-        writer.WritePropertyName("id");
-        id.WriteTo(writer);
-        writer.WritePropertyName("result");
-        writer.WriteStartObject();
-        writeResult(writer);
-        writer.WriteEndObject();
-        writer.WriteEndObject();
-        await writer.FlushAsync();
+        await WriteMcpJsonRpcMessage(response, useEventStream, writer =>
+        {
+            writer.WriteStartObject();
+            writer.WriteString("jsonrpc", "2.0");
+            writer.WritePropertyName("id");
+            id.WriteTo(writer);
+            writer.WritePropertyName("result");
+            writer.WriteStartObject();
+            writeResult(writer);
+            writer.WriteEndObject();
+            writer.WriteEndObject();
+        });
     }
 
-    private static async Task WriteMcpJsonRpcError(HttpResponse response, JsonElement? id, int code, string message)
+    private static async Task WriteMcpJsonRpcError(HttpResponse response, JsonElement? id, int code, string message, bool useEventStream = false)
     {
-        response.ContentType = "application/json; charset=utf-8";
-        await using var writer = new Utf8JsonWriter(response.Body);
-        writer.WriteStartObject();
-        writer.WriteString("jsonrpc", "2.0");
-        writer.WritePropertyName("id");
-        if (id.HasValue)
-            id.Value.WriteTo(writer);
-        else
-            writer.WriteNullValue();
-        writer.WriteStartObject("error");
-        writer.WriteNumber("code", code);
-        writer.WriteString("message", message);
-        writer.WriteEndObject();
-        writer.WriteEndObject();
-        await writer.FlushAsync();
+        await WriteMcpJsonRpcMessage(response, useEventStream, writer =>
+        {
+            writer.WriteStartObject();
+            writer.WriteString("jsonrpc", "2.0");
+            writer.WritePropertyName("id");
+            if (id.HasValue)
+                id.Value.WriteTo(writer);
+            else
+                writer.WriteNullValue();
+            writer.WriteStartObject("error");
+            writer.WriteNumber("code", code);
+            writer.WriteString("message", message);
+            writer.WriteEndObject();
+            writer.WriteEndObject();
+        });
+    }
+
+    private static async Task WriteMcpJsonRpcMessage(HttpResponse response, bool useEventStream, Action<Utf8JsonWriter> writeMessage)
+    {
+        ApplyMcpResponseContentType(response, useEventStream);
+
+        if (useEventStream)
+        {
+            await using var memoryStream = new System.IO.MemoryStream();
+            await using (var writer = new Utf8JsonWriter(memoryStream))
+            {
+                writeMessage(writer);
+                await writer.FlushAsync();
+            }
+
+            var payload = System.Text.Encoding.UTF8.GetString(memoryStream.ToArray());
+            await response.WriteAsync($"data: {payload}\n\n");
+            await response.Body.FlushAsync();
+            return;
+        }
+
+        await using var jsonWriter = new Utf8JsonWriter(response.Body);
+        writeMessage(jsonWriter);
+        await jsonWriter.FlushAsync();
     }
 
     private static List<HostedServiceDescription> GetHostedServiceDescriptions(List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, bool discoverForMcpTools = false, HttpRequest request = null)
