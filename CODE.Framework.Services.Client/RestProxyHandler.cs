@@ -3,15 +3,13 @@
 /// <summary>
 /// Standard implementation for a REST Proxy handler
 /// </summary>
-public class RestProxyHandler : IProxyHandler
+/// <remarks>
+/// Initializes a new instance of the <see cref="RestProxyHandler"/> class.
+/// </remarks>
+/// <param name="serviceUri">The service root URI.</param>
+public class RestProxyHandler(Uri serviceUri) : IProxyHandler
 {
-    /// <summary>
-    /// Initializes a new instance of the <see cref="RestProxyHandler"/> class.
-    /// </summary>
-    /// <param name="serviceUri">The service root URI.</param>
-    public RestProxyHandler(Uri serviceUri) => _serviceUri = serviceUri;
-
-    private readonly Uri _serviceUri;
+    private readonly Uri _serviceUri = serviceUri;
     private Type _contractType;
 
     /// <summary>
@@ -27,14 +25,13 @@ public class RestProxyHandler : IProxyHandler
 
         if (_contractType == null)
         {
-            var declaringType = method.DeclaringType;
-            if (declaringType == null) throw new Exception("Can't determine declaring type of method '" + method.Name + "'.");
+            var declaringType = method.DeclaringType ?? throw new Exception($"Can't determine declaring type of method '{method.Name}'.");
             if (declaringType.IsInterface)
                 _contractType = declaringType;
             else
             {
                 var interfaces = declaringType.GetInterfaces();
-                if (interfaces.Length != 1) throw new Exception("Can't determine declaring contract interface for method '" + method.Name + "'.");
+                if (interfaces.Length != 1) throw new Exception($"Can't determine declaring contract interface for method '{method.Name}'.");
                 _contractType = interfaces[0];
             }
         }
@@ -52,47 +49,45 @@ public class RestProxyHandler : IProxyHandler
                 // File response from a REST/HTTP call is a special case, as it returns the raw file. 
                 // To make everything work transparently, we thus re-assembly a file response object here.
                 var fileResponseContent = new byte[0];
-                using (var client = new WebClient())
+                using var client = new WebClient();
+                client.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                client.Encoding = Encoding.UTF8;
+                switch (httpMethod)
                 {
-                    client.Headers.Add("Content-Type", "application/json; charset=utf-8");
-                    client.Encoding = Encoding.UTF8;
-                    switch (httpMethod)
-                    {
-                        case "POST":
-                            fileResponseContent = client.UploadData(serviceUriAbsoluteUri, Encoding.UTF8.GetBytes(JsonHelper.SerializeToRestJson(data)));
-                            break;
-                        case "GET":
-                            var serializedData = RestHelper.SerializeToUrlParameters(data, "GET");
-                            var serviceFullUrl = serviceUriAbsoluteUri + serializedData;
-                            fileResponseContent = client.DownloadData(serviceFullUrl);
-                            break;
-                        default:
-                            fileResponseContent = client.UploadData(serviceUriAbsoluteUri, httpMethod, Encoding.UTF8.GetBytes(JsonHelper.SerializeToRestJson(data)));
-                            break;
-                    }
-                    var fileName = string.Empty;
-                    if (client.ResponseHeaders["Content-Disposition"] != null)
-                    {
-                        fileName = client.ResponseHeaders["Content-Disposition"];
-                        if (fileName.IndexOf("filename=\"") > -1)
-                        {
-                            fileName = fileName.Substring(fileName.IndexOf("filename=\"") + 10);
-                            if (fileName.EndsWith("\""))
-                                fileName = fileName.Substring(0, fileName.Length - 1);
-                        } 
-                    }
-
-                    var contentType = "application/x-binary";
-                    if (client.ResponseHeaders["Content-Type"] != null)
-                        contentType = client.ResponseHeaders["Content-Type"];
-
-                    return new FileResponse
-                    {
-                        FileBytes = fileResponseContent,
-                        ContentType = contentType,
-                        FileName = fileName
-                    };
+                    case "POST":
+                        fileResponseContent = client.UploadData(serviceUriAbsoluteUri, Encoding.UTF8.GetBytes(JsonHelper.SerializeToRestJson(data)));
+                        break;
+                    case "GET":
+                        var serializedData = RestHelper.SerializeToUrlParameters(data, "GET");
+                        var serviceFullUrl = serviceUriAbsoluteUri + serializedData;
+                        fileResponseContent = client.DownloadData(serviceFullUrl);
+                        break;
+                    default:
+                        fileResponseContent = client.UploadData(serviceUriAbsoluteUri, httpMethod, Encoding.UTF8.GetBytes(JsonHelper.SerializeToRestJson(data)));
+                        break;
                 }
+                var fileName = string.Empty;
+                if (client.ResponseHeaders["Content-Disposition"] != null)
+                {
+                    fileName = client.ResponseHeaders["Content-Disposition"];
+                    if (fileName.IndexOf("filename=\"") > -1)
+                    {
+                        fileName = fileName.Substring(fileName.IndexOf("filename=\"") + 10);
+                        if (fileName.EndsWith("\""))
+                            fileName = fileName.Substring(0, fileName.Length - 1);
+                    }
+                }
+
+                var contentType = "application/x-binary";
+                if (client.ResponseHeaders["Content-Type"] != null)
+                    contentType = client.ResponseHeaders["Content-Type"];
+
+                return new FileResponse
+                {
+                    FileBytes = fileResponseContent,
+                    ContentType = contentType,
+                    FileName = fileName
+                };
             }
             else
             {
@@ -117,6 +112,7 @@ public class RestProxyHandler : IProxyHandler
         }
     }
 }
+
 /// <summary>Represents a communication error in either the service or client application.</summary>
 [Serializable]
 public class CommunicationException : SystemException

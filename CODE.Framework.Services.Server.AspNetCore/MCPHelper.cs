@@ -17,9 +17,9 @@ public static class McpHelper
         if (componentModelDescriptionAttribute != null && !string.IsNullOrEmpty(componentModelDescriptionAttribute.Description))
             return componentModelDescriptionAttribute.Description.Trim();
 
-        if (xmlDocumentationFiles.ContainsKey(methodInterface.Assembly))
+        if (xmlDocumentationFiles.TryGetValue(methodInterface.Assembly, out XmlCodeDocumentationFile value1))
         {
-            var xmlDescription = xmlDocumentationFiles[methodInterface.Assembly].GetDescriptionFromXmlDocs(interfaceMethod);
+            var xmlDescription = value1.GetDescriptionFromXmlDocs(interfaceMethod);
             if (!string.IsNullOrEmpty(xmlDescription))
                 return xmlDescription;
         }
@@ -41,9 +41,9 @@ public static class McpHelper
         if (componentModelDescriptionAttribute != null && !string.IsNullOrEmpty(componentModelDescriptionAttribute.Description))
             return componentModelDescriptionAttribute.Description.Trim();
 
-        if (xmlDocumentationFiles.ContainsKey(type.Assembly))
+        if (xmlDocumentationFiles.TryGetValue(type.Assembly, out XmlCodeDocumentationFile value1))
         {
-            var xmlDescription = xmlDocumentationFiles[type.Assembly].GetDescriptionFromXmlDocs(type);
+            var xmlDescription = value1.GetDescriptionFromXmlDocs(type);
             if (!string.IsNullOrEmpty(xmlDescription))
                 return xmlDescription;
         }
@@ -119,9 +119,9 @@ public static class McpHelper
         if (componentModelDescriptionAttribute != null && !string.IsNullOrEmpty(componentModelDescriptionAttribute.Description))
             return componentModelDescriptionAttribute.Description.Trim();
 
-        if (xmlDocumentationFiles.ContainsKey(property.DeclaringType.Assembly))
+        if (xmlDocumentationFiles.TryGetValue(property.DeclaringType.Assembly, out XmlCodeDocumentationFile value1))
         {
-            var xmlDescription = xmlDocumentationFiles[property.DeclaringType.Assembly].GetDescriptionFromXmlDocs(property);
+            var xmlDescription = value1.GetDescriptionFromXmlDocs(property);
             if (!string.IsNullOrEmpty(xmlDescription))
                 return xmlDescription;
         }
@@ -148,7 +148,7 @@ public static class McpHelper
 
     public static string GetToolTitle(HostedServiceDescription serviceDescription, ServiceOperationDescription operation)
     {
-        if (!string.IsNullOrEmpty(operation.Title)) return operation.Title; 
+        if (!string.IsNullOrEmpty(operation.Title)) return operation.Title;
 
         var title = string.Empty;
 
@@ -162,8 +162,8 @@ public static class McpHelper
             var toolName = GetToolName(serviceDescription, operation);
             if (!string.IsNullOrEmpty(toolName))
             {
-                if (toolName.Length > 1 && toolName.Substring(0, 1) == "I" && toolName.Substring(1, 1) == toolName.Substring(1, 1).ToUpper())
-                    toolName = toolName.Substring(1);
+                if (toolName.Length > 1 && toolName[..1] == "I" && toolName.Equals(toolName.Substring(1, 1), StringComparison.OrdinalIgnoreCase))
+                    toolName = toolName[1..];
                 toolName = toolName.Replace("_", " ");
                 toolName = toolName.Replace("  ", " ");
                 toolName = toolName.Replace("  ", " ");

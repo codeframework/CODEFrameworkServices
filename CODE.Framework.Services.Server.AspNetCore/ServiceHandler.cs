@@ -1,11 +1,9 @@
 ﻿using CODE.Framework.Services.Server.AspNetCore.Properties;
 using Microsoft.AspNetCore.Http.Extensions;
-using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Globalization;
 using System.Security.Claims;
 using System.Security.Principal;
-using System.Threading.Tasks;
 
 namespace CODE.Framework.Services.Server.AspNetCore;
 
@@ -105,8 +103,7 @@ public class ServiceHandler
         {
             // If there was an exception, we may handle it automatically, IF either the operation or the entire type is flagged to auto-handle exceptions
             var handlerAttribute = context.MethodContext.MethodInfo.GetCustomAttributeEx<StandardExceptionHandlingAttribute>();
-            if (handlerAttribute is null)
-                handlerAttribute = context.MethodContext.MethodInfo.DeclaringType.GetCustomAttributeEx<StandardExceptionHandlingAttribute>();
+            handlerAttribute ??= context.MethodContext.MethodInfo.DeclaringType.GetCustomAttributeEx<StandardExceptionHandlingAttribute>();
 
             if (handlerAttribute is not null)
             {
@@ -134,7 +131,7 @@ public class ServiceHandler
         {
             // This is a special case in which we stream the file back low level (side-stepping any kind of JSON serialization)
             context.HttpResponse.ContentType = fileResponse.ContentType;
-            context.HttpResponse.Headers.Append("Content-Disposition" , $"inline; filename=\"{fileResponse.FileName.Trim()}\"");
+            context.HttpResponse.Headers.Append("Content-Disposition", $"inline; filename=\"{fileResponse.FileName.Trim()}\"");
             await context.HttpResponse.Body.WriteAsync(fileResponse.FileBytes, 0, fileResponse.FileBytes.Length);
         }
         else
@@ -176,10 +173,7 @@ public class ServiceHandler
         }
 
         // Let DI create the Service instance
-        var serviceInstance = HttpContext.RequestServices.GetService(serviceType);
-        if (serviceInstance == null)
-            throw new InvalidOperationException(string.Format(Resources.UnableToCreateTypeInstance, serviceType));
-
+        var serviceInstance = HttpContext.RequestServices.GetService(serviceType) ?? throw new InvalidOperationException(string.Format(Resources.UnableToCreateTypeInstance, serviceType));
         var principal = HttpContext.User;
         UserPrincipalHelper.AddPrincipal(serviceInstance, principal);
 
@@ -193,7 +187,7 @@ public class ServiceHandler
             if (!handlerContext.MethodContext.IsAsync)
                 handlerContext.ResultValue = methodToInvoke.Invoke(serviceInstance, parameterList);
             else
-                handlerContext.ResultValue = await (dynamic) methodToInvoke.Invoke(serviceInstance, parameterList);
+                handlerContext.ResultValue = await (dynamic)methodToInvoke.Invoke(serviceInstance, parameterList);
         }
         catch (Exception ex)
         {
@@ -215,7 +209,7 @@ public class ServiceHandler
     private async Task<object[]> GetMethodParametersAsync(ServiceHandlerRequestContext handlerContext)
     {
         // parameter parsing
-        var parameterList = new object[] { };
+        var parameterList = Array.Empty<object>();
 
         // simplistic - no parameters or single body post parameter
         var paramInfos = handlerContext.MethodContext.MethodInfo.GetParameters();
@@ -275,7 +269,7 @@ public class ServiceHandler
                 }
             }
 
-        parameterList = new[] {parameterData};
+        parameterList = [parameterData];
 
         return parameterList;
     }
@@ -290,7 +284,7 @@ public class ServiceHandler
     private static object UrlParameterToValue(string sourceString, Type targetType, CultureInfo culture = null)
     {
         var isEmpty = string.IsNullOrEmpty(sourceString);
-        if (culture == null) culture = CultureInfo.InvariantCulture;
+        culture ??= CultureInfo.InvariantCulture;
 
         if (targetType == typeof(string))
             return sourceString;
@@ -320,10 +314,10 @@ public class ServiceHandler
         else if (targetType.IsEnum)
             return Enum.Parse(targetType, sourceString);
         else if (targetType == typeof(byte[]))
-            return new byte[0]; // We are not supporting type arrays for this purpose
+            return Array.Empty<byte>(); // We are not supporting type arrays for this purpose
         else if (targetType.Name.StartsWith("Nullable`")) // Nullables are special. If they are null, we just return that. Otherwise, we unpack them and then run the current method again with that value.
         {
-            if (sourceString.ToLower() == "null" || sourceString == string.Empty)
+            if (sourceString.Equals("null", StringComparison.CurrentCultureIgnoreCase) || sourceString == string.Empty)
                 return null;
             else
             {
@@ -348,7 +342,8 @@ public class ServiceHandler
     {
         if (user?.Identity != null && user.Identity.IsAuthenticated)
         {
-            if (user.Identity is ClaimsIdentity identity) {
+            if (user.Identity is ClaimsIdentity identity)
+            {
                 var rolesClaim = identity.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role);
                 if (rolesClaim == null)
                     return; // no role requirement
@@ -356,7 +351,7 @@ public class ServiceHandler
                 if (string.IsNullOrEmpty(rolesClaim.Value))
                     return; // no role requirement or empty and we're authenticated
 
-                var roles = rolesClaim.Value.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries);
+                var roles = rolesClaim.Value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
                 foreach (var role in roles)
                     if (authorizationRoles.Any(r => r == role))
                         return; // matched a role
@@ -365,7 +360,7 @@ public class ServiceHandler
 
         throw new UnauthorizedAccessException("Access denied: User is not part of required Role.");
     }
-    
+
     public static async Task SendJsonResponseAsync(ServiceHandlerRequestContext context, object value)
     {
         var response = context.HttpResponse;

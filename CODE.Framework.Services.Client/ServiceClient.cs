@@ -9,16 +9,16 @@ public static class ServiceClient
     }
 
     /// <summary>Internal message size cache</summary>
-    private static readonly Dictionary<string, MessageSize> CachedMessageSizes = new Dictionary<string, MessageSize>();
+    private static readonly Dictionary<string, MessageSize> CachedMessageSizes = [];
 
     /// <summary>Cached protocols</summary>
-    private static readonly Dictionary<string, Protocol> CachedProtocols = new Dictionary<string, Protocol>();
+    private static readonly Dictionary<string, Protocol> CachedProtocols = [];
 
     /// <summary>The cached service ids</summary>
-    private static readonly Dictionary<Type, string> CachedServiceIds = new Dictionary<Type, string>();
+    private static readonly Dictionary<Type, string> CachedServiceIds = [];
 
     /// <summary>Internal settings cache</summary>
-    private static readonly Dictionary<string, string> SettingsCache = new Dictionary<string, string>();
+    private static readonly Dictionary<string, string> SettingsCache = [];
 
     /// <summary>
     /// Indicates whether configuration settings should be cached (default = yes)
@@ -182,32 +182,15 @@ public static class ServiceClient
         if (string.IsNullOrEmpty(protocolName)) protocolName = GetSetting("ServiceProtocol").ToLower(CultureInfo.InvariantCulture);
         if (string.IsNullOrEmpty(protocolName)) return Protocol.RestHttpJson; // This default has changed since the full framework implementation, where it was TCP/IP
 
-        Protocol protocol;
-        switch (protocolName)
+        var protocol = protocolName switch
         {
-            case "inprocess":
-                protocol = Protocol.InProcess;
-                break;
-            case "wshttp":
-                protocol = Protocol.WsHttp;
-                break;
-            case "basichttp":
-                protocol = Protocol.BasicHttp;
-                break;
-            case "rest":
-            case "restjson":
-            case "resthttpjson":
-                protocol = Protocol.RestHttpJson;
-                break;
-            case "restxml":
-            case "resthttpxml":
-                protocol = Protocol.RestHttpXml;
-                break;
-            default:
-                protocol = Protocol.NetTcp;
-                break;
-        }
-
+            "inprocess" => Protocol.InProcess,
+            "wshttp" => Protocol.WsHttp,
+            "basichttp" => Protocol.BasicHttp,
+            "rest" or "restjson" or "resthttpjson" => Protocol.RestHttpJson,
+            "restxml" or "resthttpxml" => Protocol.RestHttpXml,
+            _ => Protocol.NetTcp,
+        };
         if (CacheSettings)
             lock (CachedProtocols)
                 if (CachedProtocols.ContainsKey(key))
@@ -216,54 +199,6 @@ public static class ServiceClient
                     CachedProtocols.Add(key, protocol);
 
         return protocol;
-    }
-
-    /// <summary>
-    /// Gets the allowable message size for a specific interface
-    /// </summary>
-    /// <typeparam name="TServiceType">The type of the T service type.</typeparam>
-    /// <returns>MessageSize.</returns>
-    private static MessageSize GetMessageSize<TServiceType>() => GetMessageSize(typeof(TServiceType).Name);
-
-    /// <summary>
-    /// Gets the allowable message size for a specific interface
-    /// </summary>
-    /// <param name="interfaceName">Name of the interface.</param>
-    /// <returns>MessageSize.</returns>
-    private static MessageSize GetMessageSize(string interfaceName)
-    {
-        var key = "ServiceMessageSize:" + interfaceName;
-        lock (CachedMessageSizes)
-            if (CacheSettings && CachedMessageSizes.ContainsKey(key))
-                return CachedMessageSizes[key];
-
-        var messageSize = GetSetting(key).ToLower(CultureInfo.InvariantCulture);
-        var size = MessageSize.Medium;
-
-        switch (messageSize)
-        {
-            case "large":
-                size = MessageSize.Large;
-                break;
-            case "normal":
-                size = MessageSize.Normal;
-                break;
-            case "verylarge":
-                size = MessageSize.VeryLarge;
-                break;
-            case "max":
-                size = MessageSize.Max;
-                break;
-        }
-
-        if (CacheSettings)
-            lock (CachedMessageSizes)
-                if (CachedMessageSizes.ContainsKey(key))
-                    CachedMessageSizes[key] = size;
-                else
-                    CachedMessageSizes.Add(key, size);
-
-        return size;
     }
 
     /// <summary>

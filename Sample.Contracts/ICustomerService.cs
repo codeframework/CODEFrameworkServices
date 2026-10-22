@@ -1,6 +1,4 @@
-﻿using System.Threading.Tasks;
-
-namespace Sample.Contracts;
+﻿namespace Sample.Contracts;
 
 /// <summary>
 /// Service operations related to customers
@@ -94,7 +92,6 @@ public class GetStatusResponse : BaseServiceResponse
     [DataMember]
     public CustomerStatus Status { get; set; } = CustomerStatus.Normal;
 }
-
 
 [DataContract]
 public class GetStatusRequest

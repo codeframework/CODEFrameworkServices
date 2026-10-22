@@ -1,5 +1,4 @@
 ﻿using CODE.Framework.Services.Server.AspNetCore.Properties;
-using System.Threading.Tasks;
 
 namespace CODE.Framework.Services.Server.AspNetCore.Configuration;
 
@@ -79,7 +78,6 @@ public class ServiceHandlerConfigurationInstance
     /// You have to also specify the AssemblyName
     /// </summary>
     public string ServiceTypeName { get; set; }
-
 
     /// <summary>
     /// If specifying a type name you also have to specify the

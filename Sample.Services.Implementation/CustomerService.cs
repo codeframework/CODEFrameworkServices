@@ -40,10 +40,10 @@ public class CustomerService : ICustomerService, IServiceEvents
         {
             CustomerList =
             [
-                new Customer { Name = "Markus Egger", Company = "CODE", Id = "1" },
-                new Customer { Name = "Ellen Whitney", Company = "CODE", Id = "2" },
-                new Customer { Name = "Mike Yeager", Company = "CODE", Id = "3" },
-                new Customer { Name = "Otto Dobretsberger", Company = "CODE", Id = "4" }
+                new() { Name = "Markus Egger", Company = "CODE", Id = "1" },
+                new() { Name = "Ellen Whitney", Company = "CODE", Id = "2" },
+                new() { Name = "Mike Yeager", Company = "CODE", Id = "3" },
+                new() { Name = "Otto Dobretsberger", Company = "CODE", Id = "4" }
             ]
         };
 
@@ -52,14 +52,12 @@ public class CustomerService : ICustomerService, IServiceEvents
         return response;
     }
 
-    public DeleteCustomerResponse DeleteCustomer(DeleteCustomerRequest request)
-    {
-        // Pretending to delete the customer for demonstration purposes
-        return new DeleteCustomerResponse
-        {
-            DeletedCustomerId = request.Id
-        };
-    }
+    /// <summary>
+    /// Pretending to delete the customer for demonstration purposes
+    /// </summary>
+    /// <param name="request">Request object</param>
+    /// <returns>Response</returns>
+    public DeleteCustomerResponse DeleteCustomer(DeleteCustomerRequest request) => new DeleteCustomerResponse { DeletedCustomerId = request.Id };
 
     [AiTool(Name = "SearchCustomers", Description = "Returns customers based on the provided search string (inactive customers can optionally be included).")]
     public SearchTestResponse SearchTest(SearchTestRequest request)
@@ -84,11 +82,11 @@ public class CustomerService : ICustomerService, IServiceEvents
     [AiTool(Description = "Returns a customer based on the provided customer ID.")]
     public GetCustomerResponse GetCustomer(GetCustomerRequest request) => new()
     {
-        Customer = new Customer 
-        { 
-            Id = request.Id, 
-            Name = "Markus Egger", 
-            Company = "CODE" 
+        Customer = new Customer
+        {
+            Id = request.Id,
+            Name = "Markus Egger",
+            Company = "CODE"
         }
     };
 
@@ -105,7 +103,7 @@ public class CustomerService : ICustomerService, IServiceEvents
         // Could add some special code here for in-process hosting specific things that need to happen
     }
 
-    public GetStatusResponse GetStatus(GetStatusRequest request) => new GetStatusResponse { Status = request.Status };
+    public GetStatusResponse GetStatus(GetStatusRequest request) => new() { Status = request.Status };
 
-    public FileResponse UploadCustomerFile(UploadCustomerFileRequest request) => new FileResponse { ContentType = request.ContentType, FileBytes = request.FileBytes, FileName = request.FileName };
+    public FileResponse UploadCustomerFile(UploadCustomerFileRequest request) => new() { ContentType = request.ContentType, FileBytes = request.FileBytes, FileName = request.FileName };
 }

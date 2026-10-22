@@ -5,7 +5,7 @@ namespace CODE.Framework.Services.Contracts;
 
 public static class UserPrincipalHelper
 {
-    private static Dictionary<object, IPrincipal> Principals { get; } = new Dictionary<object, IPrincipal>();
+    private static Dictionary<object, IPrincipal> Principals { get; } = [];
 
     public static IPrincipal GetCurrentPrincipal(this object instance)
     {

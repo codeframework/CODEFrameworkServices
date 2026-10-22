@@ -174,26 +174,4 @@ public static class RestHelper
         public int Sequence { get; set; }
         public PropertyInfo Property { get; set; }
     }
-
-    private static object ConvertValue(string value, Type propertyType)
-    {
-        if (propertyType == typeof(string)) return value; // Very likely case, so we handle this right away, even though we are also handling it below
-        if (propertyType.IsEnum) return Enum.Parse(propertyType, value);
-        if (propertyType == typeof(Guid)) return Guid.Parse(value);
-        if (propertyType == typeof(bool)) return Convert.ToBoolean(value);
-        if (propertyType == typeof(byte)) return Convert.ToByte(value);
-        if (propertyType == typeof(char)) return Convert.ToChar(value);
-        if (propertyType == typeof(DateTime)) return Convert.ToDateTime(value);
-        if (propertyType == typeof(decimal)) return Convert.ToDecimal(value);
-        if (propertyType == typeof(double)) return Convert.ToDouble(value);
-        if (propertyType == typeof(short)) return Convert.ToInt16(value);
-        if (propertyType == typeof(int)) return Convert.ToInt32(value);
-        if (propertyType == typeof(long)) return Convert.ToInt64(value);
-        if (propertyType == typeof(sbyte)) return Convert.ToSByte(value);
-        if (propertyType == typeof(float)) return Convert.ToSingle(value);
-        if (propertyType == typeof(ushort)) return Convert.ToUInt16(value);
-        if (propertyType == typeof(uint)) return Convert.ToUInt32(value);
-        if (propertyType == typeof(ulong)) return Convert.ToUInt64(value);
-        return value;
-    }
 }

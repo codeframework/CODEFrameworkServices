@@ -1,23 +1,22 @@
-﻿namespace CODE.Framework.Fundamentals.Utilities.Csv
+﻿namespace CODE.Framework.Fundamentals.Utilities.Csv;
+
+/// <summary>
+/// Specifies the action to take when a parsing error has occured.
+/// </summary>
+public enum ParseErrorAction
 {
     /// <summary>
-    /// Specifies the action to take when a parsing error has occured.
+    /// Raises the <see cref="M:CsvReader.ParseError"/> event.
     /// </summary>
-    public enum ParseErrorAction
-    {
-        /// <summary>
-        /// Raises the <see cref="M:CsvReader.ParseError"/> event.
-        /// </summary>
-        RaiseEvent = 0,
+    RaiseEvent = 0,
 
-        /// <summary>
-        /// Tries to advance to next line.
-        /// </summary>
-        AdvanceToNextLine = 1,
+    /// <summary>
+    /// Tries to advance to next line.
+    /// </summary>
+    AdvanceToNextLine = 1,
 
-        /// <summary>
-        /// Throws an exception.
-        /// </summary>
-        ThrowException = 2,
-    }
+    /// <summary>
+    /// Throws an exception.
+    /// </summary>
+    ThrowException = 2,
 }

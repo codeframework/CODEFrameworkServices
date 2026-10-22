@@ -9,11 +9,11 @@ public static class ServiceGardenLocal
     /// Collection of known hosts
     /// </summary>
     /// <value>Hosts</value>
-    private static Dictionary<Type, object> Hosts { get; } = new Dictionary<Type, object>();
+    private static Dictionary<Type, object> Hosts { get; } = [];
 
     private static bool _useDependencyInjection = false;
-    private static readonly Dictionary<Type, Type> _transientDependencies = new Dictionary<Type, Type>();
-    private static readonly Dictionary<Type, SingletonDependencyWrapper> _singletonDependencies = new Dictionary<Type, SingletonDependencyWrapper>();
+    private static readonly Dictionary<Type, Type> _transientDependencies = [];
+    private static readonly Dictionary<Type, SingletonDependencyWrapper> _singletonDependencies = [];
 
     private class SingletonDependencyWrapper
     {
@@ -151,8 +151,7 @@ public static class ServiceGardenLocal
         else
         {
             serviceInstance = CreateInstanceWithDependencies(serviceType);
-            if (serviceInstance == null)
-                serviceInstance = Activator.CreateInstance(serviceType);
+            serviceInstance ??= Activator.CreateInstance(serviceType);
         }
 
         if (serviceInstance == null) return false;
@@ -212,8 +211,7 @@ public static class ServiceGardenLocal
                 throw new DependencyInjectionException($"Type {parameter.ParameterType.Name} has no registered concrete implementation. Use ServiceGardenLocal.InjectDependency() during app startup, to speficy a concrete type for this dependency.");
         }
 
-        var objectInstance = Activator.CreateInstance(serviceType, parameterValues.ToArray());
-        return objectInstance;
+        return Activator.CreateInstance(serviceType, parameterValues.ToArray());
     }
 
     /// <summary>
@@ -231,16 +229,9 @@ public static class ServiceGardenLocal
     public static object GetService(Type contractType) => Hosts.ContainsKey(contractType) ? Hosts[contractType] : null;
 }
 
-public class InProcessProxyHandler : IProxyHandler
+public class InProcessProxyHandler(object instance) : IProxyHandler
 {
-    private readonly object _instance;
-    private readonly Type _type;
-
-    public InProcessProxyHandler(object instance)
-    {
-        _instance = instance;
-        _type = instance.GetType();
-    }
+    private readonly Type _type = instance.GetType();
 
     public object OnMethod(MethodInfo method, object[] args)
     {
@@ -249,14 +240,13 @@ public class InProcessProxyHandler : IProxyHandler
         {
             try
             {
-                return realMethod.Invoke(_instance, args);
+                return realMethod.Invoke(instance, args);
             }
             catch (Exception ex)
             {
                 // If there was an exception, we may handle it automatically, IF either the operation or the entire type is flagged to auto-handle exceptions
                 var handlerAttribute = realMethod.GetCustomAttributeEx<StandardExceptionHandlingAttribute>();
-                if (handlerAttribute is null)
-                    handlerAttribute = realMethod.DeclaringType.GetCustomAttributeEx<StandardExceptionHandlingAttribute>();
+                handlerAttribute ??= realMethod.DeclaringType.GetCustomAttributeEx<StandardExceptionHandlingAttribute>();
 
                 if (handlerAttribute is not null)
                 {
@@ -274,7 +264,4 @@ public class InProcessProxyHandler : IProxyHandler
     }
 }
 
-public class DependencyInjectionException : Exception
-{
-    public DependencyInjectionException(string message) : base(message) { }
-}
+public class DependencyInjectionException(string message) : Exception(message) { }

@@ -1,5 +1,4 @@
-﻿using System.Threading.Tasks;
-using System.Xml;
+﻿using System.Xml;
 using DescriptionAttribute = CODE.Framework.Services.Contracts.DescriptionAttribute;
 
 namespace CODE.Framework.Services.Server.AspNetCore;
@@ -7,7 +6,7 @@ namespace CODE.Framework.Services.Server.AspNetCore;
 public class OpenApiInformation
 {
     public string Openapi => "3.0.3";
-    public OpenApiInfo Info { get; set; } = new OpenApiInfo();
+    public OpenApiInfo Info { get; set; } = new();
 
     [JsonConverter(typeof(PathJsonConverter))]
     public Dictionary<string, OpenApiPathInfo> Paths { get; set; } = [];
@@ -333,77 +332,76 @@ public class ComponentsJsonConverter : JsonConverter<Dictionary<string, OpenApiS
 
     private static void WriteDefaultValue(Utf8JsonWriter writer, Type propertyType, PropertyInfo propertyInfo, object parentObject)
     {
-        if (parentObject != null)
+        if (parentObject == null) return;
+
+        object defaultValue = null;
+        try
         {
-            object defaultValue = null;
-            try
+            defaultValue = propertyInfo.GetValue(parentObject);
+        }
+        catch
+        {
+            defaultValue = null;
+        }
+        if (defaultValue != null)
+        {
+            if (propertyType.IsEnum)
             {
-                defaultValue = propertyInfo.GetValue(parentObject);
+                writer.WritePropertyName("default");
+                writer.WriteNumberValue((int)defaultValue);
             }
-            catch
+            else if (propertyType == typeof(string) || propertyType == typeof(char))
             {
-                defaultValue = null;
+                var defaultString = defaultValue.ToString();
+                if (!string.IsNullOrEmpty(defaultString))
+                {
+                    writer.WritePropertyName("default");
+                    writer.WriteStringValue(defaultString);
+                }
             }
-            if (defaultValue != null)
+            else if (propertyType == typeof(Guid))
             {
-                if (propertyType.IsEnum)
+                writer.WritePropertyName("default");
+                writer.WriteStringValue(((Guid)defaultValue).ToString());
+            }
+            else if (propertyType == typeof(int))
+            {
+                writer.WritePropertyName("default");
+                writer.WriteNumberValue((int)defaultValue);
+            }
+            else if (propertyType == typeof(short))
+            {
+                writer.WritePropertyName("default");
+                writer.WriteNumberValue((short)defaultValue);
+            }
+            else if (propertyType == typeof(long))
+            {
+                writer.WritePropertyName("default");
+                writer.WriteNumberValue((long)defaultValue);
+            }
+            else if (propertyType == typeof(decimal))
+            {
+                writer.WritePropertyName("default");
+                writer.WriteNumberValue((decimal)defaultValue);
+            }
+            else if (propertyType == typeof(double))
+            {
+                writer.WritePropertyName("default");
+                writer.WriteNumberValue((double)defaultValue);
+            }
+            else if (propertyType == typeof(DateTime))
+            {
+                var defaultDateTime = (DateTime)defaultValue;
+                if (defaultDateTime != DateTime.MinValue && defaultDateTime != DateTime.MaxValue)
                 {
                     writer.WritePropertyName("default");
-                    writer.WriteNumberValue((int)defaultValue);
+                    writer.WriteStringValue((DateTime)defaultValue); // TODO: This is probably not right in terms of the format
                 }
-                else if (propertyType == typeof(string) || propertyType == typeof(char))
-                {
-                    var defaultString = defaultValue.ToString();
-                    if (!string.IsNullOrEmpty(defaultString))
-                    {
-                        writer.WritePropertyName("default");
-                        writer.WriteStringValue(defaultString);
-                    }
-                }
-                else if (propertyType == typeof(Guid))
-                {
-                    writer.WritePropertyName("default");
-                    writer.WriteStringValue(((Guid)defaultValue).ToString());
-                }
-                else if (propertyType == typeof(int))
-                {
-                    writer.WritePropertyName("default");
-                    writer.WriteNumberValue((int)defaultValue);
-                }
-                else if (propertyType == typeof(short))
-                {
-                    writer.WritePropertyName("default");
-                    writer.WriteNumberValue((short)defaultValue);
-                }
-                else if (propertyType == typeof(long))
-                {
-                    writer.WritePropertyName("default");
-                    writer.WriteNumberValue((long)defaultValue);
-                }
-                else if (propertyType == typeof(decimal))
-                {
-                    writer.WritePropertyName("default");
-                    writer.WriteNumberValue((decimal)defaultValue);
-                }
-                else if (propertyType == typeof(double))
-                {
-                    writer.WritePropertyName("default");
-                    writer.WriteNumberValue((double)defaultValue);
-                }
-                else if (propertyType == typeof(DateTime))
-                {
-                    var defaultDateTime = (DateTime)defaultValue;
-                    if (defaultDateTime != DateTime.MinValue && defaultDateTime != DateTime.MaxValue)
-                    {
-                        writer.WritePropertyName("default");
-                        writer.WriteStringValue((DateTime)defaultValue); // TODO: This is probably not right in terms of the format
-                    }
-                }
-                else if (propertyType == typeof(bool))
-                {
-                    writer.WritePropertyName("default");
-                    writer.WriteBooleanValue((bool)defaultValue);
-                }
+            }
+            else if (propertyType == typeof(bool))
+            {
+                writer.WritePropertyName("default");
+                writer.WriteBooleanValue((bool)defaultValue);
             }
         }
     }
@@ -496,7 +494,7 @@ public class PathJsonConverter : JsonConverter<Dictionary<string, OpenApiPathInf
                 }
                 writer.WriteStringValue(description);
 
-                if (verb.ToLowerInvariant() != "get")
+                if (!verb.Equals("get", StringComparison.InvariantCultureIgnoreCase))
                 {
                     writer.WriteStartArray("consumes");
                     writer.WriteStringValue("application/json");
@@ -878,9 +876,9 @@ public static class OpenApiHelper
         if (summaryAttribute != null && !string.IsNullOrEmpty(summaryAttribute.Summary))
             return summaryAttribute.Summary.Trim();
 
-        if (xmlDocumentationFiles.ContainsKey(type.Assembly))
+        if (xmlDocumentationFiles.TryGetValue(type.Assembly, out XmlCodeDocumentationFile value1))
         {
-            var xmlSummary = xmlDocumentationFiles[type.Assembly].GetSummaryFromXmlDocs(type);
+            var xmlSummary = value1.GetSummaryFromXmlDocs(type);
             if (!string.IsNullOrEmpty(xmlSummary))
                 return xmlSummary;
         }
@@ -943,16 +941,16 @@ public static class OpenApiHelper
         if (componentModelDescriptionAttribute2 != null && !string.IsNullOrEmpty(componentModelDescriptionAttribute2.Description))
             return componentModelDescriptionAttribute2.Description.Trim();
 
-        if (xmlDocumentationFiles.ContainsKey(implementationType.Assembly))
+        if (xmlDocumentationFiles.TryGetValue(implementationType.Assembly, out XmlCodeDocumentationFile value1))
         {
-            var xmlDescription = xmlDocumentationFiles[implementationType.Assembly].GetDescriptionFromXmlDocs(implementationType);
+            var xmlDescription = value1.GetDescriptionFromXmlDocs(implementationType);
             if (!string.IsNullOrEmpty(xmlDescription))
                 return xmlDescription;
         }
 
-        if (xmlDocumentationFiles.ContainsKey(interfaceType.Assembly))
+        if (xmlDocumentationFiles.TryGetValue(interfaceType.Assembly, out XmlCodeDocumentationFile value2))
         {
-            var xmlDescription = xmlDocumentationFiles[interfaceType.Assembly].GetDescriptionFromXmlDocs(interfaceType);
+            var xmlDescription = value2.GetDescriptionFromXmlDocs(interfaceType);
             if (!string.IsNullOrEmpty(xmlDescription))
                 return xmlDescription;
         }
@@ -970,9 +968,9 @@ public static class OpenApiHelper
         if (componentModelDescriptionAttribute != null && !string.IsNullOrEmpty(componentModelDescriptionAttribute.Description))
             return componentModelDescriptionAttribute.Description.Trim();
 
-        if (xmlDocumentationFiles.ContainsKey(property.DeclaringType.Assembly))
+        if (xmlDocumentationFiles.TryGetValue(property.DeclaringType.Assembly, out XmlCodeDocumentationFile value1))
         {
-            var xmlDescription = xmlDocumentationFiles[property.DeclaringType.Assembly].GetDescriptionFromXmlDocs(property);
+            var xmlDescription = value1.GetDescriptionFromXmlDocs(property);
             if (!string.IsNullOrEmpty(xmlDescription))
                 return xmlDescription;
         }
@@ -990,9 +988,9 @@ public static class OpenApiHelper
         if (componentModelDescriptionAttribute != null && !string.IsNullOrEmpty(componentModelDescriptionAttribute.Description))
             return componentModelDescriptionAttribute.Description.Trim();
 
-        if (xmlDocumentationFiles.ContainsKey(methodInterface.Assembly))
+        if (xmlDocumentationFiles.TryGetValue(methodInterface.Assembly, out XmlCodeDocumentationFile value1))
         {
-            var xmlDescription = xmlDocumentationFiles[methodInterface.Assembly].GetDescriptionFromXmlDocs(interfaceMethod);
+            var xmlDescription = value1.GetDescriptionFromXmlDocs(interfaceMethod);
             if (!string.IsNullOrEmpty(xmlDescription))
                 return xmlDescription;
         }
@@ -1006,9 +1004,9 @@ public static class OpenApiHelper
         if (ummaryAttribute != null && !string.IsNullOrEmpty(ummaryAttribute.Summary))
             return ummaryAttribute.Summary.Trim();
 
-        if (xmlDocumentationFiles.ContainsKey(methodInterface.Assembly))
+        if (xmlDocumentationFiles.TryGetValue(methodInterface.Assembly, out XmlCodeDocumentationFile value1))
         {
-            var xmlSummary = xmlDocumentationFiles[methodInterface.Assembly].GetSummaryFromXmlDocs(interfaceMethod);
+            var xmlSummary = value1.GetSummaryFromXmlDocs(interfaceMethod);
             if (!string.IsNullOrEmpty(xmlSummary))
                 return xmlSummary;
         }
@@ -1071,7 +1069,7 @@ public static class OpenApiHelper
 
     public static object[] GetOpenApiEnumValues(Type type)
     {
-        if (!type.IsEnum) return new object[0];
+        if (!type.IsEnum) return [];
 
         var enumValues = Enum.GetValues(type);
         var enumType = type.GetEnumUnderlyingType();
@@ -1150,10 +1148,7 @@ public class OpenApiNamedOperationParameter : IOpenApiOperationParameter
 
 public class OpenApiPositionalOperationParameter : OpenApiNamedOperationParameter
 {
-    public OpenApiPositionalOperationParameter()
-    {
-        Required = true;
-    }
+    public OpenApiPositionalOperationParameter() => Required = true;
 
     public int PositionIndex { get; set; }
 }

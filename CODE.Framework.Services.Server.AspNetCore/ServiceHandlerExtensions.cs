@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Http.Extensions;
 using DescriptionAttribute = CODE.Framework.Services.Contracts.DescriptionAttribute;
 using System.Security.Claims;
 using System.Security.Principal;
-using System.Threading.Tasks;
 
 namespace CODE.Framework.Services.Server.AspNetCore;
 
@@ -82,13 +81,13 @@ public static class ServiceHandlerExtensions
                                   if (config.Cors.AllowedOrigins == "*")
                                       builder = builder.SetIsOriginAllowed(s => true);
                                   else if (!string.IsNullOrEmpty(config.Cors.AllowedOrigins))
-                                      builder.WithOrigins(config.Cors.AllowedOrigins.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries));
+                                      builder.WithOrigins(config.Cors.AllowedOrigins.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries));
 
                                   if (!string.IsNullOrEmpty(config.Cors.AllowedMethods))
-                                      builder.WithMethods(config.Cors.AllowedMethods.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries));
+                                      builder.WithMethods(config.Cors.AllowedMethods.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries));
 
                                   if (!string.IsNullOrEmpty(config.Cors.AllowedHeaders))
-                                      builder.WithHeaders(config.Cors.AllowedHeaders.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries));
+                                      builder.WithHeaders(config.Cors.AllowedHeaders.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries));
 
                                   if (config.Cors.AllowCredentials)
                                       builder.AllowCredentials();
@@ -188,10 +187,10 @@ public static class ServiceHandlerExtensions
                                                    }
                                                }
 
-                                               if (relativeRoute.StartsWith('/')) relativeRoute = relativeRoute.Substring(1);
+                                               if (relativeRoute.StartsWith('/')) relativeRoute = relativeRoute[1..];
 
                                                // Figure out the full route we pass the ASP.NET Core Route Manager
-                                               var fullRoute = (serviceInstanceConfig.RouteBasePath + "/" + relativeRoute).Replace("//", "/");
+                                               var fullRoute = ($"{serviceInstanceConfig.RouteBasePath}/{relativeRoute}").Replace("//", "/");
                                                if (fullRoute.StartsWith('/')) fullRoute = fullRoute[1..];
 
                                                // Cache reflection and context data
@@ -265,7 +264,7 @@ public static class ServiceHandlerExtensions
             }
         }
 
-        if (relativeRoute.StartsWith("/")) relativeRoute = relativeRoute[1..];
+        if (relativeRoute.StartsWith('/')) relativeRoute = relativeRoute[1..];
 
         var fullRoute = (serviceInstanceConfig.RouteBasePath + "/" + relativeRoute).Replace("//", "/");
         if (string.IsNullOrEmpty(fullRoute)) fullRoute = "/";
@@ -355,7 +354,7 @@ public static class ServiceHandlerExtensions
                                         if (!definedRoutePath.StartsWith('/')) definedRoutePath = $"/{definedRoutePath}";
                                         var subRoutes = GetSpecialToolSubRoutes([applicableServiceConfiguration]);
                                         if (subRoutes != null && subRoutes.Count > 0)
-                                        foreach (var subRoute in subRoutes)
+                                            foreach (var subRoute in subRoutes)
                                             {
                                                 var fullRoutePath = $"{definedRoutePath}/{subRoute}".Replace("//", "/");
                                                 if (requestPath.Equals(fullRoutePath, StringComparison.OrdinalIgnoreCase))
@@ -873,9 +872,9 @@ public static class ServiceHandlerExtensions
             return;
         }
 
-        var match = toolMatches[0];
-        var operation = match.Operation;
-        var serviceConfiguration = match.Service.Configuration;
+        var (Service, Operation) = toolMatches[0];
+        var operation = Operation;
+        var serviceConfiguration = Service.Configuration;
         var methodParameters = operation.Method.GetParameters();
         if (methodParameters.Length > 1)
         {
@@ -999,17 +998,15 @@ public static class ServiceHandlerExtensions
         }, useEventStream);
     }
 
-    private static void ValidateMcpToolRoles(IReadOnlyCollection<string> authorizationRoles, IPrincipal user)
+    private static void ValidateMcpToolRoles(List<string> authorizationRoles, ClaimsPrincipal user)
     {
-        if (authorizationRoles.Count == 0)
-            return;
+        if (authorizationRoles.Count == 0) return;
 
         if (user?.Identity is not ClaimsIdentity identity || !identity.IsAuthenticated)
             throw new UnauthorizedAccessException("Access denied: User is not part of required Role.");
 
         var rolesClaim = identity.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.Role);
-        if (rolesClaim == null || string.IsNullOrEmpty(rolesClaim.Value))
-            return;
+        if (rolesClaim == null || string.IsNullOrEmpty(rolesClaim.Value)) return;
 
         var roles = rolesClaim.Value.Split(',', StringSplitOptions.RemoveEmptyEntries);
         if (!roles.Any(role => authorizationRoles.Contains(role)))
@@ -1043,8 +1040,6 @@ public static class ServiceHandlerExtensions
 
     private static void WriteMcpTools(Utf8JsonWriter writer, List<ServiceHandlerConfigurationInstance> serviceInstanceConfigurations, HttpRequest request)
     {
-        var requestPath = request.Path.ToString().Trim().ToLowerInvariant();
-
         var applicableServices = GetApplicableServiceConfigurations(serviceInstanceConfigurations, request);
         var serviceDescriptions = GetHostedServiceDescriptions(applicableServices, discoverForMcpTools: true, request: request);
         foreach (var serviceDescription in serviceDescriptions)
@@ -1216,7 +1211,7 @@ public static class ServiceHandlerExtensions
         if (restAttribute == null) return null;
 
         var httpVerb = restAttribute.Method.ToString().ToLowerInvariant();
-        var definedRoute = restAttribute.Route != null ? restAttribute.Route : restAttribute.Name == null ? $"{method.Name}" : $"{restAttribute.Name}";
+        var definedRoute = restAttribute.Route ?? (restAttribute.Name == null ? $"{method.Name}" : $"{restAttribute.Name}");
         var fullRoute = string.IsNullOrEmpty(definedRoute) ? $"{serviceInstanceConfig.RouteBasePath}" : $"{serviceInstanceConfig.RouteBasePath}/{definedRoute}";
         if (string.IsNullOrEmpty(fullRoute)) fullRoute = "/";
 
@@ -1602,7 +1597,7 @@ public static class ServiceHandlerExtensions
             }
         }
 
-        await JsonSerializer.SerializeAsync(resp.Body, openApiInfo, typeof(OpenApiInformation), _jsonSerializerOptions);
+        await JsonSerializer.SerializeAsync(resp.Body, openApiInfo, _jsonSerializerOptions);
     };
 
     private static Dictionary<Assembly, XmlCodeDocumentationFile> GetXmlDocumentationFiles(IEnumerable<HostedServiceDescription> serviceDescriptions)
@@ -1614,7 +1609,7 @@ public static class ServiceHandlerExtensions
         return xmlDocumentationFiles;
     }
 
-    private static JsonSerializerOptions _jsonSerializerOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    private static readonly JsonSerializerOptions _jsonSerializerOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     /// <summary>
     /// Extracts the RestAttribute from a propertyInfo's attributes

@@ -21,8 +21,6 @@ public class MethodInvocationContext
 
     public bool IsAsync { get; set; }
 
-
-
     public ServiceHandlerConfigurationInstance InstanceConfiguration { get; set; }
 
     public ServiceHandlerConfiguration ServiceConfiguration { get; set; }
@@ -33,15 +31,15 @@ public class MethodInvocationContext
         ServiceConfiguration = serviceConfiguration;
         MethodInfo = method;
 
-        var attribute = (AsyncStateMachineAttribute) method.GetCustomAttribute(typeof(AsyncStateMachineAttribute));
+        var attribute = (AsyncStateMachineAttribute)method.GetCustomAttribute(typeof(AsyncStateMachineAttribute));
         if (attribute != null)
             IsAsync = true;
 
-        RestAttribute = method.GetCustomAttribute(typeof(RestAttribute), true) as RestAttribute;
+        RestAttribute = method.GetCustomAttribute<RestAttribute>(true);
 
         // set allowable authorization roles
         if (RestAttribute?.AuthorizationRoles == null) return;
-        AuthorizationRoles = RestAttribute.AuthorizationRoles.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries).ToList();
+        AuthorizationRoles = RestAttribute.AuthorizationRoles.Split([','], StringSplitOptions.RemoveEmptyEntries).ToList();
         if (AuthorizationRoles.Count == 0)
             AuthorizationRoles.Add(string.Empty); // Any authorized user
     }

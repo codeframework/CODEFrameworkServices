@@ -183,7 +183,6 @@ public class SaveUserRequest
     [DataMember]
     public string Email { get; set; } = string.Empty;
 
-
     [DataMember(IsRequired = true)]
     public string Firstname { get; set; } = string.Empty;
 
