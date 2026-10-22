@@ -18,12 +18,12 @@ public class ServiceHandlerConfiguration
     /// <summary>
     /// Holds a list of services that are configured to be handled.
     /// </summary>
-    public List<ServiceHandlerConfigurationInstance> Services { get; set; } = new List<ServiceHandlerConfigurationInstance>();
+    public List<ServiceHandlerConfigurationInstance> Services { get; set; } = [];
 
     /// <summary>
     /// CORS specific configuration settings for the entire service
     /// </summary>
-    public ServiceHandlerCorsConfiguration Cors { get; set; } = new ServiceHandlerCorsConfiguration();
+    public ServiceHandlerCorsConfiguration Cors { get; set; } = new();
 }
 
 /// <summary>
