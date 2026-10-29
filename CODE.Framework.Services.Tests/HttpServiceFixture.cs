@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -22,6 +23,7 @@ public class HttpServiceFixture : IAsyncLifetime
     private ServiceHandlerConfiguration _previousConfiguration;
     public ExecutionLog Log { get; } = new();
     public string ServiceUrl { get; private set; }
+    public Func<HttpContext, Task<bool>> InterceptRequest { get; set; }
 
     public async Task InitializeAsync()
     {
@@ -36,6 +38,11 @@ public class HttpServiceFixture : IAsyncLifetime
             config.Services.Add(new ServiceHandlerConfigurationInstance { ServiceType = typeof(TestService), RouteBasePath = "/test" });
         });
         _app = builder.Build();
+        _app.Use(async (context, next) =>
+        {
+            var interceptor = InterceptRequest;
+            if (interceptor == null || !await interceptor(context)) await next(context);
+        });
         _app.UseServiceHandler();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         await _app.StartAsync(timeout.Token);

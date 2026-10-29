@@ -76,13 +76,52 @@ public static class ServiceClient
         }
     }
 
+    /// <summary>Calls a service with explicit failure handling and per-operation retry options.</summary>
+    /// <remarks>Unlike the legacy overload, defaults to propagating exceptions and ignores the global legacy retry settings. Cancellation always propagates. The callback runs once; only explicitly repeatable REST operations can be retried.</remarks>
+    public static void Call<TServiceType>(ServiceCallOptions options, Action<TServiceType> action, string restServiceUrl = null) where TServiceType : class
+    {
+        if (options == null) throw new ArgumentNullException(nameof(options));
+        if (action == null) throw new ArgumentNullException(nameof(action));
+        var snapshot = options.Snapshot();
+        snapshot.CancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            TServiceType channel;
+            lock (ConfigurationCacheLock)
+            {
+                switch (GetProtocol<TServiceType>())
+                {
+                    case Protocol.RestHttpJson:
+                        var url = string.IsNullOrEmpty(restServiceUrl) ? GetSetting($"RestServiceUrl:{GetServiceId<TServiceType>()}") : restServiceUrl;
+                        channel = TransparentProxyGenerator.GetProxy<TServiceType>(new StrictRestProxyHandler(new Uri(url), snapshot));
+                        break;
+                    case Protocol.InProcess:
+                        var localService = ServiceGardenLocal.GetService<TServiceType>() ?? throw new InvalidOperationException($"No in-process service is registered for {typeof(TServiceType).FullName}.");
+                        channel = TransparentProxyGenerator.GetProxy<TServiceType>(new StrictInProcessProxyHandler(localService, snapshot.CancellationToken));
+                        break;
+                    default:
+                        throw new NotSupportedException($"The configured protocol for {typeof(TServiceType).FullName} is not supported by the options-based client.");
+                }
+            }
+            action(channel);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch when (snapshot.ExceptionBehavior == ServiceExceptionBehavior.Suppress)
+        {
+            // Explicit opt-in to suppression; the callback is never replayed.
+        }
+    }
+
     public static bool AutoRetryFailedCalls { get; set; } = false;
 
     /// <summary>Defines the delay (milliseconds) between auto-retry calls</summary>
     /// <remarks>The delay is defined in milliseconds (-1 = no delay). Note that the delay puts the thread to sleep, so this should not be done on foreground threads.</remarks>
     public static int AutoRetryDelay { get; set; } = -1;
 
-    /// <summary>Defines the list of exception types for which to auto-retry calls</summary>
+    /// <summary>Defines exact exception types for legacy callback retries. Null or empty retries any callback exception once.</summary>
     public static List<Type> AutoRetryFailedCallsForExceptions { get; set; } // TODO: = new List<Type> { typeof (EndpointNotFoundException), typeof (ServerTooBusyException) };
 
     /// <summary>When set to true (non-default), service communication errors are forwarded to the logging mediator.</summary>
@@ -94,15 +133,10 @@ public static class ServiceClient
     private static bool MustRetryCall(Exception exception)
     {
         if (!AutoRetryFailedCalls) return false;
-        if (AutoRetryFailedCallsForExceptions.Count == 0) return true;
-
-        if (AutoRetryFailedCallsForExceptions.Any(exceptionType => exception.GetType() == exceptionType))
-        {
-            if (AutoRetryDelay > 0) Thread.Sleep(AutoRetryDelay);
-            return true;
-        }
-
-        return false;
+        var exceptionTypes = AutoRetryFailedCallsForExceptions;
+        if (exceptionTypes != null && exceptionTypes.Count > 0 && !exceptionTypes.Any(exceptionType => exception.GetType() == exceptionType)) return false;
+        if (AutoRetryDelay > 0) Thread.Sleep(AutoRetryDelay);
+        return true;
     }
 
     /// <summary>

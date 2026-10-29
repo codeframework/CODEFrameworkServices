@@ -14,7 +14,7 @@ Coverage includes POST/GET/PUT/DELETE, inline and named URL parameters, Unicode 
 
 Assertions remain outside ServiceClient.Call callbacks because the current implementation swallows callback exceptions. Test parallelization is disabled because framework configuration and caches are static; one test explicitly exercises concurrent HTTP calls. Synchronous HTTP calls run on workers only to bound test waiting, not to claim async client support. Use `dotnet test --blame-hang --blame-hang-timeout 60s` as an additional process-level guard in CI.
 
-This is a baseline for currently supported behavior, not a declaration that all IL is verifiable or all interface shapes work. The pending-task test verifies proxy forwarding only, not REST async support. There are no tests endorsing swallowed exceptions. Add reproductions with the corresponding fixes for strict serialization failures, retry policy, inherited/generic interfaces, and async REST/in-process fault handling.
+This is a baseline for currently supported behavior, not a declaration that all IL is verifiable or all interface shapes work. The pending-task test verifies proxy forwarding only, not REST async support. Legacy exception swallowing is characterized for compatibility, not recommended for new calls. Inherited/generic interfaces and async REST/in-process fault handling remain separate work.
 
 The in-process test uses a unique contract because ServiceGardenLocal has no public unregister operation. Its registration lives until the test process exits. Production code is unchanged by this test project.
 
@@ -43,3 +43,35 @@ These are behavioral regression tests, not a formal IL-verifier pass. Generic me
 Channel setup and invalidation are synchronized so an overlapping setup cannot repopulate a cleared cache with its old resolution after the clear completes. Network operations happen outside this lock. Existing channels retain their endpoint, generated proxy types remain cached, and one-time property initialization (such as LogCommunicationErrors) is not rerun. CacheSettings=false bypasses cached configuration but does not erase previously cached values; clear before re-enabling caching if those values must be discarded. Updating external configuration sources is the caller's responsibility.
 
 Eight behavioral cases cover full clearing with null/empty, per-contract clearing, transport switches in both directions, global fallback across two contracts, explicit override precedence, unrelated-key and other-contract isolation, disabled caching, and endpoint refresh while retaining an old channel. HTTP calls verify actual server execution and results; local implementations return distinct identities. Six cases failed before the fix. Each test installs and removes its own configuration source and restores CacheSettings. Dedicated in-process registrations remain until process exit because the garden has no unregister API.
+
+## Exception and retry migration
+
+Existing `Call<T>(action, restServiceUrl)` and `GetChannelDedicated<T>` signatures and default exception/serialization behavior remain unchanged. Legacy retries still replay the entire callback once and match exact exception types. Two deliberate fixes apply: a null exception filter now behaves like an empty filter (retry any callback exception), and the configured delay applies to both. Enabling retries with an uninitialized filter will therefore perform a retry instead of throwing NullReferenceException. LegacyRetryTests documents these behaviors, including final exception suppression. Both bug regressions failed before the fixes.
+
+The options-first overload is an opt-in path for synchronous contract methods:
+
+```csharp
+var options = new ServiceCallOptions
+{
+    ExceptionBehavior = ServiceExceptionBehavior.Propagate,
+    MaxAttempts = 3,
+    RetryDelay = TimeSpan.FromMilliseconds(200),
+    CanRetryOperation = method => method.Name == nameof(ITestService.Lookup),
+    CancellationToken = cancellationToken
+};
+ServiceClient.Call<ITestService>(options, service =>
+{
+    var response = service.Lookup(request);
+    // Application processing happens once, outside the retry loop.
+}, serviceUrl);
+```
+
+With default options, failures propagate and no retry occurs. Options are snapshotted before the callback; legacy global retry settings do not affect this path. `MaxAttempts` includes the initial attempt. Both an increased limit and explicit operation permission are required. Only the failed REST operation is retried, not the callback or preceding operations. Permission means the application knows replay is safe; it does not provide server deduplication or exactly-once execution.
+
+Eligible HTTP statuses are 408, 429, 502, 503, and 504. Eligible connection errors are HttpRequestException chains containing a SocketException with connection reset/aborted/refused, timed-out, or try-again status. Other errors are not retried. The initial policy uses a fixed configured delay; it does not implement Retry-After, exponential backoff, or jitter. Application failure responses remain normal responses. Request serialization and response deserialization are strict and never retried; empty/null response messages are rejected. Shared JsonHelper and the legacy WebClient handler are unchanged.
+
+The new REST handler uses a shared HttpClient with cookies disabled, buffered responses, and its default timeout. Cancellation interrupts HTTP I/O and retry waits. The public method remains synchronous and blocks its caller; this is not CallAsync support. It rejects Task-returning contract operations. Use synchronous callbacks, not async-void lambdas. In-process invocation preserves registered standard exception handling, unwraps reflection exceptions, and never retries local application exceptions. Its cancellation check occurs before invocation and cannot interrupt running synchronous code.
+
+Final transport failures are ServiceTransportException (a CommunicationException subtype), with HTTP StatusCode when available and the original exception as InnerException; final transport errors honor LogCommunicationErrors. Payload failures remain Newtonsoft.Json exceptions. Explicit ExceptionBehavior.Suppress swallows final call failures without replaying the callback; cancellation and invalid options still propagate. New calls report missing registrations and unsupported protocols instead of silently skipping the callback.
+
+Tests exercise actual HTTP attempt counts, earlier-operation and callback isolation, exhausted retries/status preservation, strict payload failures, application failure responses, cancellation of live I/O, cancellation before a delayed retry, options snapshots, file responses, and local exception compatibility. Global retry settings and fixture interceptors are restored after each test. For adoption, opt in at individual call sites and add exception handling there before migrating further consumers.
