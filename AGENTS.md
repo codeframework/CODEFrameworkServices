@@ -41,7 +41,7 @@
 - Framework configuration and caches are process-wide. The test assembly disables parallel test execution; exercise concurrency explicitly inside individual tests and isolate or restore modified global state.
 - `ServiceGardenLocal` currently has no public unregister API. In-process tests use a dedicated contract to avoid contaminating HTTP tests.
 - Use bounded waits and explicit gates for asynchronous tests, not arbitrary sleeps or assumptions about scheduling. A completed Task alone does not demonstrate nonblocking behavior.
-- The suite covers successful REST/in-process calls, direct proxy dispatch, cached endpoint/handler isolation, and generated-type reuse. It does not certify every interface shape, async REST support, or IL verification. Add focused reproductions with the corresponding fixes rather than locking known bugs into the intended contract.
+- The suite covers successful REST/in-process calls, direct proxy dispatch, cached endpoint/handler isolation, generated-type reuse, and full/targeted configuration-cache invalidation. It does not certify every interface shape, async REST support, or IL verification. Add focused reproductions with the corresponding fixes rather than locking known bugs into the intended contract.
 - Keep samples and test documentation consistent with supported behavior. Report what was actually run and any remaining validation limitations.
 
 ## Documentation

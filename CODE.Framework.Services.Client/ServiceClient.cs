@@ -20,6 +20,10 @@ public static class ServiceClient
     /// <summary>Internal settings cache</summary>
     private static readonly Dictionary<string, string> SettingsCache = [];
 
+    // Keep channel configuration resolution atomic with cache invalidation. Network calls
+    // occur on the returned channel, outside this lock.
+    private static readonly object ConfigurationCacheLock = new();
+
     /// <summary>
     /// Indicates whether configuration settings should be cached (default = yes)
     /// </summary>
@@ -118,6 +122,12 @@ public static class ServiceClient
     /// </remarks>
     public static TServiceType GetChannelDedicated<TServiceType>(string restUrl = null) where TServiceType : class
     {
+        lock (ConfigurationCacheLock)
+            return CreateChannel<TServiceType>(restUrl);
+    }
+
+    private static TServiceType CreateChannel<TServiceType>(string restUrl) where TServiceType : class
+    {
         switch (GetProtocol<TServiceType>())
         {
 #if FULLFRAMEWORK
@@ -146,20 +156,43 @@ public static class ServiceClient
     }
 
     /// <summary>
-    /// Clears either an individual setting (if a setting name is provided as the parameter),
-    /// or all settings.
+    /// Clears a cached setting and its derived protocol selection, or all client configuration caches.
     /// </summary>
     /// <param name="setting">Setting to clear (if not provided, all settings are cleared).</param>
+    /// <remarks>
+    /// Clearing ServiceProtocol invalidates all resolved protocols; contract overrides remain in effect.
+    /// Clearing ServiceProtocol:ContractName invalidates only that contract's resolved protocol.
+    /// Other named settings leave unrelated cached settings intact. Null or empty clears all caches.
+    /// Existing channels and generated proxy types are unaffected; new channels use refreshed settings.
+    /// This does not reload properties initialized once from configuration, such as LogCommunicationErrors.
+    /// </remarks>
     public static void ClearSettingsCache(string setting = null)
     {
-        lock (SettingsCache)
+        lock (ConfigurationCacheLock)
         {
             if (string.IsNullOrEmpty(setting))
-                SettingsCache.Clear();
-            else if (SettingsCache.ContainsKey(setting))
-                SettingsCache.Remove(setting);
-
-            // Generated proxy types contain no service configuration. New channels receive new handlers.
+            {
+                lock (SettingsCache)
+                    SettingsCache.Clear();
+                lock (CachedProtocols)
+                    CachedProtocols.Clear();
+                lock (CachedServiceIds)
+                    CachedServiceIds.Clear();
+                lock (CachedMessageSizes)
+                    CachedMessageSizes.Clear();
+            }
+            else
+            {
+                lock (SettingsCache)
+                    SettingsCache.Remove(setting);
+                lock (CachedProtocols)
+                {
+                    if (setting == "ServiceProtocol")
+                        CachedProtocols.Clear();
+                    else if (setting.StartsWith("ServiceProtocol:", StringComparison.Ordinal))
+                        CachedProtocols.Remove(setting);
+                }
+            }
         }
     }
 
