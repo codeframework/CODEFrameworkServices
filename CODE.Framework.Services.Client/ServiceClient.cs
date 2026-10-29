@@ -1,5 +1,7 @@
 ﻿namespace CODE.Framework.Services.Client;
 
+using System.Threading.Tasks;
+
 public static class ServiceClient
 {
     static ServiceClient()
@@ -86,23 +88,7 @@ public static class ServiceClient
         snapshot.CancellationToken.ThrowIfCancellationRequested();
         try
         {
-            TServiceType channel;
-            lock (ConfigurationCacheLock)
-            {
-                switch (GetProtocol<TServiceType>())
-                {
-                    case Protocol.RestHttpJson:
-                        var url = string.IsNullOrEmpty(restServiceUrl) ? GetSetting($"RestServiceUrl:{GetServiceId<TServiceType>()}") : restServiceUrl;
-                        channel = TransparentProxyGenerator.GetProxy<TServiceType>(new StrictRestProxyHandler(new Uri(url), snapshot));
-                        break;
-                    case Protocol.InProcess:
-                        var localService = ServiceGardenLocal.GetService<TServiceType>() ?? throw new InvalidOperationException($"No in-process service is registered for {typeof(TServiceType).FullName}.");
-                        channel = TransparentProxyGenerator.GetProxy<TServiceType>(new StrictInProcessProxyHandler(localService, snapshot.CancellationToken));
-                        break;
-                    default:
-                        throw new NotSupportedException($"The configured protocol for {typeof(TServiceType).FullName} is not supported by the options-based client.");
-                }
-            }
+            var channel = CreateOptionsChannel<TServiceType>(snapshot, restServiceUrl, false);
             action(channel);
         }
         catch (OperationCanceledException)
@@ -112,6 +98,66 @@ public static class ServiceClient
         catch when (snapshot.ExceptionBehavior == ServiceExceptionBehavior.Suppress)
         {
             // Explicit opt-in to suppression; the callback is never replayed.
+        }
+    }
+
+    /// <summary>Awaits a callback using Task&lt;TResponse&gt; contract operations. Failures propagate by default; no retries are enabled.</summary>
+    public static Task CallAsync<TServiceType>(Func<TServiceType, Task> action, string restServiceUrl = null) where TServiceType : class
+        => CallAsync(new ServiceCallOptions(), action, restServiceUrl);
+
+    /// <summary>Awaits a callback with explicit cancellation, exception, and per-operation REST retry options.</summary>
+    /// <remarks>The callback starts on the calling context and runs once. Await its service operations; do not start unobserved work. Cancellation always propagates.</remarks>
+    public static async Task CallAsync<TServiceType>(ServiceCallOptions options, Func<TServiceType, Task> action, string restServiceUrl = null) where TServiceType : class
+    {
+        if (options == null) throw new ArgumentNullException(nameof(options));
+        if (action == null) throw new ArgumentNullException(nameof(action));
+        var snapshot = options.Snapshot();
+        snapshot.CancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var channel = CreateOptionsChannel<TServiceType>(snapshot, restServiceUrl, true);
+            await action(channel).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch when (snapshot.ExceptionBehavior == ServiceExceptionBehavior.Suppress) { }
+    }
+
+    /// <summary>Awaits a callback and returns its result. Contract operations must return Task&lt;TResponse&gt;.</summary>
+    public static Task<TResult> CallAsync<TServiceType, TResult>(Func<TServiceType, Task<TResult>> action, string restServiceUrl = null) where TServiceType : class
+        => CallAsync(new ServiceCallOptions(), action, restServiceUrl);
+
+    /// <summary>Awaits a result-producing callback with explicit service-call options.</summary>
+    /// <remarks>Explicit suppression returns default(TResult) on failure. Cancellation always propagates. Legacy retry settings do not apply.</remarks>
+    public static async Task<TResult> CallAsync<TServiceType, TResult>(ServiceCallOptions options, Func<TServiceType, Task<TResult>> action, string restServiceUrl = null) where TServiceType : class
+    {
+        if (options == null) throw new ArgumentNullException(nameof(options));
+        if (action == null) throw new ArgumentNullException(nameof(action));
+        var snapshot = options.Snapshot();
+        snapshot.CancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var channel = CreateOptionsChannel<TServiceType>(snapshot, restServiceUrl, true);
+            return await action(channel).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch when (snapshot.ExceptionBehavior == ServiceExceptionBehavior.Suppress) { return default; }
+    }
+
+    private static TServiceType CreateOptionsChannel<TServiceType>(ServiceCallOptions snapshot, string restServiceUrl, bool asyncOperations) where TServiceType : class
+    {
+        lock (ConfigurationCacheLock)
+        {
+            switch (GetProtocol<TServiceType>())
+            {
+                case Protocol.RestHttpJson:
+                    var url = string.IsNullOrEmpty(restServiceUrl) ? GetSetting($"RestServiceUrl:{GetServiceId<TServiceType>()}") : restServiceUrl;
+                    return TransparentProxyGenerator.GetProxy<TServiceType>(new StrictRestProxyHandler(new Uri(url), snapshot, asyncOperations));
+                case Protocol.InProcess:
+                    var service = ServiceGardenLocal.GetService<TServiceType>() ?? throw new InvalidOperationException($"No in-process service is registered for {typeof(TServiceType).FullName}.");
+                    return TransparentProxyGenerator.GetProxy<TServiceType>(new StrictInProcessProxyHandler(service, snapshot.CancellationToken, asyncOperations));
+                default:
+                    throw new NotSupportedException($"The configured protocol for {typeof(TServiceType).FullName} is not supported by the options-based client.");
+            }
         }
     }
 

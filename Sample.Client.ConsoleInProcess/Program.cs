@@ -122,4 +122,7 @@ ServiceClient.Call<ICustomerService>(s =>
 
 Console.ForegroundColor = originalColor;
 Console.WriteLine();
+Console.WriteLine("Calling GetCustomersAsync in-process...");
+var asyncResponse = await ServiceClient.CallAsync<ICustomerService, GetCustomersResponse>(service => service.GetCustomersAsync(new GetCustomersRequest()));
+Console.WriteLine($"Async customers retrieved: {asyncResponse.CustomerList.Count}");
 Console.WriteLine("Done.");

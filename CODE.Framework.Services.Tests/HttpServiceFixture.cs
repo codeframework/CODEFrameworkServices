@@ -22,6 +22,7 @@ public class HttpServiceFixture : IAsyncLifetime
     private WebApplication _app;
     private ServiceHandlerConfiguration _previousConfiguration;
     public ExecutionLog Log { get; } = new();
+    public AsyncServiceState AsyncState { get; } = new();
     public string ServiceUrl { get; private set; }
     public Func<HttpContext, Task<bool>> InterceptRequest { get; set; }
 
@@ -32,10 +33,12 @@ public class HttpServiceFixture : IAsyncLifetime
         builder.Logging.ClearProviders();
         builder.WebHost.ConfigureKestrel(options => options.Listen(IPAddress.Loopback, 0));
         builder.Services.AddSingleton(Log);
+        builder.Services.AddSingleton(AsyncState);
         builder.Services.AddHostedServices(config =>
         {
             config.Services.Clear();
             config.Services.Add(new ServiceHandlerConfigurationInstance { ServiceType = typeof(TestService), RouteBasePath = "/test" });
+            config.Services.Add(new ServiceHandlerConfigurationInstance { ServiceType = typeof(AsyncTestService), RouteBasePath = "/async" });
         });
         _app = builder.Build();
         _app.Use(async (context, next) =>

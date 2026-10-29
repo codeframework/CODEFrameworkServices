@@ -5,7 +5,7 @@ using Newtonsoft.Json;
 
 namespace CODE.Framework.Services.Client;
 
-internal class StrictRestProxyHandler(Uri serviceUri, ServiceCallOptions options) : IProxyHandler
+internal class StrictRestProxyHandler(Uri serviceUri, ServiceCallOptions options, bool asyncOperations = false) : IProxyHandler
 {
     // Cookie state must not leak between unrelated calls sharing this client.
     private static readonly HttpClient Client = new(new HttpClientHandler { UseCookies = false });
@@ -13,10 +13,25 @@ internal class StrictRestProxyHandler(Uri serviceUri, ServiceCallOptions options
     public object OnMethod(MethodInfo method, object[] args)
     {
         if (args.Length != 1) throw new ArgumentException("REST operations require exactly one request message.");
+        if (asyncOperations)
+        {
+            if (!method.ReturnType.IsGenericType || method.ReturnType.GetGenericTypeDefinition() != typeof(Task<>))
+                throw new NotSupportedException("CallAsync requires contract operations returning Task<TResponse>.");
+            return typeof(StrictRestProxyHandler).GetMethod(nameof(InvokeTypedAsync), BindingFlags.NonPublic | BindingFlags.Instance)
+                .MakeGenericMethod(method.ReturnType.GetGenericArguments()[0]).Invoke(this, new object[] { method, args[0] });
+        }
         if (typeof(Task).IsAssignableFrom(method.ReturnType)) throw new NotSupportedException("The options-based synchronous client requires synchronous contract methods.");
+        return InvokeLoggedAsync(method, args[0], method.ReturnType).GetAwaiter().GetResult();
+    }
+
+    private async Task<TResponse> InvokeTypedAsync<TResponse>(MethodInfo method, object request)
+        => (TResponse)await InvokeLoggedAsync(method, request, typeof(TResponse)).ConfigureAwait(false);
+
+    private async Task<object> InvokeLoggedAsync(MethodInfo method, object request, Type responseType)
+    {
         try
         {
-            return InvokeAsync(method, args[0]).GetAwaiter().GetResult();
+            return await InvokeAsync(method, request, responseType).ConfigureAwait(false);
         }
         catch (ServiceTransportException exception)
         {
@@ -25,7 +40,7 @@ internal class StrictRestProxyHandler(Uri serviceUri, ServiceCallOptions options
         }
     }
 
-    private async Task<object> InvokeAsync(MethodInfo method, object request)
+    private async Task<object> InvokeAsync(MethodInfo method, object request, Type responseType)
     {
         var token = options.CancellationToken;
         token.ThrowIfCancellationRequested();
@@ -52,7 +67,7 @@ internal class StrictRestProxyHandler(Uri serviceUri, ServiceCallOptions options
                     }
                 }
                 token.ThrowIfCancellationRequested();
-                if (method.ReturnType == typeof(FileResponse))
+                if (responseType == typeof(FileResponse))
                     return new FileResponse
                     {
                         FileBytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false),
@@ -61,7 +76,7 @@ internal class StrictRestProxyHandler(Uri serviceUri, ServiceCallOptions options
                     };
                 var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 token.ThrowIfCancellationRequested();
-                return JsonConvert.DeserializeObject(json, method.ReturnType) ?? throw new JsonSerializationException("The service returned no response message.");
+                return JsonConvert.DeserializeObject(json, responseType) ?? throw new JsonSerializationException("The service returned no response message.");
             }
             catch (ServiceTransportException exception) when (repeatable && attempt < options.MaxAttempts && IsTransient(exception.StatusCode))
             {

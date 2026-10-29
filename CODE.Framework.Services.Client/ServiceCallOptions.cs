@@ -16,7 +16,7 @@ public class ServiceCallOptions
     /// <remarks>This is an idempotency decision, not an exception filter. A lost response may follow successful server execution. A true result permits retrying only the client's narrowly classified transient transport failures.</remarks>
     public Func<MethodInfo, bool> CanRetryOperation { get; set; }
 
-    /// <summary>Cancels REST I/O and retry delays, and is checked before in-process invocation. Does not interrupt running synchronous application code.</summary>
+    /// <summary>Cancels REST I/O and retry delays. For in-process calls, checks before invocation and cancels waiting for task results; service execution itself is not forcibly interrupted. Does not interrupt application callback code.</summary>
     public CancellationToken CancellationToken { get; set; }
 
     internal ServiceCallOptions Snapshot()

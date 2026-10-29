@@ -14,7 +14,7 @@ Coverage includes POST/GET/PUT/DELETE, inline and named URL parameters, Unicode 
 
 Assertions remain outside ServiceClient.Call callbacks because the current implementation swallows callback exceptions. Test parallelization is disabled because framework configuration and caches are static; one test explicitly exercises concurrent HTTP calls. Synchronous HTTP calls run on workers only to bound test waiting, not to claim async client support. Use `dotnet test --blame-hang --blame-hang-timeout 60s` as an additional process-level guard in CI.
 
-This is a baseline for currently supported behavior, not a declaration that all IL is verifiable or all interface shapes work. The pending-task test verifies proxy forwarding only, not REST async support. Legacy exception swallowing is characterized for compatibility, not recommended for new calls. Inherited/generic interfaces and async REST/in-process fault handling remain separate work.
+This is a baseline for currently supported behavior, not a declaration that all IL is verifiable or all interface shapes work. The direct proxy pending-task test verifies forwarding; AsyncServiceTests separately exercises real async REST and in-process calls. Legacy exception swallowing is characterized for compatibility, not recommended for new calls. Inherited/generic interfaces remain separate work.
 
 The in-process test uses a unique contract because ServiceGardenLocal has no public unregister operation. Its registration lives until the test process exits. Production code is unchanged by this test project.
 
@@ -75,3 +75,29 @@ The new REST handler uses a shared HttpClient with cookies disabled, buffered re
 Final transport failures are ServiceTransportException (a CommunicationException subtype), with HTTP StatusCode when available and the original exception as InnerException; final transport errors honor LogCommunicationErrors. Payload failures remain Newtonsoft.Json exceptions. Explicit ExceptionBehavior.Suppress swallows final call failures without replaying the callback; cancellation and invalid options still propagate. New calls report missing registrations and unsupported protocols instead of silently skipping the callback.
 
 Tests exercise actual HTTP attempt counts, earlier-operation and callback isolation, exhausted retries/status preservation, strict payload failures, application failure responses, cancellation of live I/O, cancellation before a delayed retry, options snapshots, file responses, and local exception compatibility. Global retry settings and fixture interceptors are restored after each test. For adoption, opt in at individual call sites and add exception handling there before migrating further consumers.
+
+## CallAsync for task-returning contracts
+
+`CallAsync<TService>(Func<TService, Task>, string restServiceUrl = null)` awaits the entire callback. `CallAsync<TService, TResult>(Func<TService, Task<TResult>>, string restServiceUrl = null)` returns its result. Both also have options-first overloads using ServiceCallOptions. The options are snapshotted, failures propagate by default, cancellation always propagates, and legacy global retries are ignored. Explicit suppression completes the nonresult overload normally or returns default(TResult) from the result overload.
+
+```csharp
+await ServiceClient.CallAsync<ICustomerService>(async service =>
+{
+    var response = await service.GetCustomersAsync(new GetCustomersRequest());
+    Console.WriteLine(response.CustomerList.Count);
+});
+
+var customers = await ServiceClient.CallAsync<ICustomerService, GetCustomersResponse>(
+    new ServiceCallOptions { CancellationToken = cancellationToken },
+    service => service.GetCustomersAsync(new GetCustomersRequest()));
+```
+
+Operations invoked through CallAsync must return Task<TResponse>. Synchronous methods, bare Task operations, ValueTask operations, and arbitrary awaitables are outside this initial scope. Mixed contracts are allowed, but invoking a synchronous member through the async channel is rejected. Existing synchronous Call overloads and the legacy REST channel retain their behavior. Use CallAsync rather than passing async lambdas to the Action-based Call API.
+
+The async REST proxy returns an actual Task<TResponse> and deserializes only TResponse. Task<FileResponse> uses the binary response path. It reuses cancellable HttpClient I/O and Task.Delay for per-operation retries, without Task.Run or blocking waits in the async execution path. The same strict serialization, transient classifications, and operation-repeatability requirements apply as for the options-based synchronous API.
+
+The callback starts on the caller's context. Application awaits capture their context normally; library-internal awaits avoid capturing it. Await every service task used by the callback; unobserved fire-and-forget work is not tracked. The call's token cancels service I/O, retry waits, and waiting for in-process service tasks, not arbitrary application callback work. In-process cancellation does not stop the underlying service; a later task fault is observed internally. HTTP cancellation does not guarantee that server-side work stops either.
+
+REST hosting now detects task return types even when implementations forward tasks without the async keyword. In-process proxies await Task<TResponse> methods so standard failure conversion works for both immediate invocation exceptions and faults after await; unhandled faults preserve the original exception, and cancellation remains cancellation. The synchronous in-process path is unchanged. This task handling also applies to tasks obtained directly from the registered in-process proxy.
+
+Async tests use independently controlled received/release gates, real HTTP hosting, and local hosting of the same contract. They cover pending returns, forwarded tasks, callback completion and faults, service faults before/after task creation, failure responses, concurrent pending requests, binary responses, cancellation, bounded retries without callback replay, invalid JSON, suppression, argument validation, and caller synchronization-context preservation on a dedicated thread. Neither Task.FromResult-only tests nor arbitrary sleeps stand in for asynchronous execution. Both console samples now include a result-returning CallAsync example.

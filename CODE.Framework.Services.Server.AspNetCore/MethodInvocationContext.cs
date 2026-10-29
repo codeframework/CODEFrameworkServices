@@ -32,7 +32,7 @@ public class MethodInvocationContext
         MethodInfo = method;
 
         var attribute = (AsyncStateMachineAttribute)method.GetCustomAttribute(typeof(AsyncStateMachineAttribute));
-        if (attribute != null)
+        if (attribute != null || typeof(Task).IsAssignableFrom(method.ReturnType))
             IsAsync = true;
 
         RestAttribute = method.GetCustomAttribute<RestAttribute>(true);

@@ -1,5 +1,8 @@
 ﻿namespace CODE.Framework.Services.Client;
 
+using System.Runtime.ExceptionServices;
+using System.Threading.Tasks;
+
 /// <summary>
 /// Provides an in-process service garden
 /// </summary>
@@ -238,6 +241,9 @@ public class InProcessProxyHandler(object instance) : IProxyHandler
         var realMethod = _type.GetMethod(method.Name);
         if (realMethod != null)
         {
+            if (realMethod.ReturnType.IsGenericType && realMethod.ReturnType.GetGenericTypeDefinition() == typeof(Task<>))
+                return typeof(InProcessProxyHandler).GetMethod(nameof(InvokeTaskAsync), BindingFlags.NonPublic | BindingFlags.Instance)
+                    .MakeGenericMethod(realMethod.ReturnType.GetGenericArguments()[0]).Invoke(this, new object[] { realMethod, args });
             try
             {
                 return realMethod.Invoke(instance, args);
@@ -261,6 +267,26 @@ public class InProcessProxyHandler(object instance) : IProxyHandler
         }
         else
             throw new Exception($"Method {method.Name} not found on type {_type.Name}.");
+    }
+
+    private async Task<TResponse> InvokeTaskAsync<TResponse>(MethodInfo method, object[] args)
+    {
+        try
+        {
+            return await ((Task<TResponse>)method.Invoke(instance, args)).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            var error = exception is TargetInvocationException invocation && invocation.InnerException != null ? invocation.InnerException : exception;
+            if (error is not OperationCanceledException)
+            {
+                var handling = method.GetCustomAttributeEx<StandardExceptionHandlingAttribute>() ?? method.DeclaringType.GetCustomAttributeEx<StandardExceptionHandlingAttribute>();
+                if (handling != null)
+                    return (TResponse)ServiceHelper.GetPopulatedFailureResponse(typeof(TResponse), error, method.DeclaringType.Name, method.Name);
+            }
+            ExceptionDispatchInfo.Capture(error).Throw();
+            throw;
+        }
     }
 }
 
