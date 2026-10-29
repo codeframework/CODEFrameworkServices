@@ -27,3 +27,11 @@ The active .NET Standard (`NETCORE`) implementation now caches generated types r
 `useProxyCache: true` reuses the generated type. `false` generates a fresh type without reading or modifying the cache. `ClearProxyCache` removes cached type entries, leaves existing instances usable, and does not unload emitted types. Repeated bypassing or explicit clearing can therefore still accumulate types. `ServiceClient.ClearSettingsCache` no longer clears generated types because they contain no endpoint configuration. This change does not fix the separate derived protocol/settings invalidation issue.
 
 The inactive historical `NETFULL` implementation is unchanged and is not covered by this suite. No emitted method bodies, exception policy, retry behavior, or async transport support are changed in this fix.
+
+## IL corrections
+
+The subsequent IL fix in the active `NETCORE` implementation adds reference-return casts (including Task returns), an explicit MethodBase-to-MethodInfo cast, and correctly sized argument-index operands. Valid handler results retain their behavior; incompatible reference results now throw InvalidCastException at the proxy boundary instead of escaping as incorrectly typed references. Value returns continue to use unboxing and void methods continue to discard the handler result.
+
+ProxyIlTests adds ten cases: invalid message/task/interface results, valid null/derived/interface-compatible results, invalid boxed value results, and complete argument preservation with 1, 255, 256, and 257 parameters. Large contracts are generated inside the tests because the proxy generator is a general utility, even though REST uses single-message operations. Five cases failed before the corrections: all three invalid reference results and both calls exceeding the short argument-index boundary. Existing tests also verify exact MethodInfo dispatch and pending-task identity/completion.
+
+These are behavioral regression tests, not a formal IL-verifier pass. Generic methods, generic declaring interfaces, inherited interfaces, and by-reference signatures are separate work; this fix does not claim support for them or modify the inactive NETFULL branch.

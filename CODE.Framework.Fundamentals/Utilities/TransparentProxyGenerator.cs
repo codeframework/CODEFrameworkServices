@@ -87,6 +87,7 @@ public static class TransparentProxyGenerator
                 var methodInfo = il.DeclareLocal(typeof(MethodInfo));
                 il.Emit(OpCodes.Ldtoken, method);
                 il.Emit(OpCodes.Call, typeof(MethodBase).GetMethod("GetMethodFromHandle", new[] { typeof(RuntimeMethodHandle) }));
+                il.Emit(OpCodes.Castclass, typeof(MethodInfo));
                 il.Emit(OpCodes.Stloc, methodInfo);
 
                 for (var counter = 0; counter < privateParameterCount; counter++)
@@ -95,7 +96,12 @@ public static class TransparentProxyGenerator
 
                     il.Emit(OpCodes.Ldloc, argArray);
                     il.Emit(OpCodes.Ldc_I4, counter);
-                    il.Emit(OpCodes.Ldarg_S, counter + 1);
+                    // ldarg.s has a one-byte operand; ldarg has an unsigned two-byte index.
+                    var argumentIndex = counter + 1; // Argument zero is the proxy instance.
+                    if (argumentIndex <= byte.MaxValue)
+                        il.Emit(OpCodes.Ldarg_S, (byte)argumentIndex);
+                    else
+                        il.Emit(OpCodes.Ldarg, unchecked((short)argumentIndex));
                     if (info.ParameterType.IsPrimitive || info.ParameterType.IsValueType)
                         il.Emit(OpCodes.Box, info.ParameterType);
                     il.Emit(OpCodes.Stelem_Ref);
@@ -106,11 +112,12 @@ public static class TransparentProxyGenerator
                 il.Emit(OpCodes.Ldloc, methodInfo);
                 il.Emit(OpCodes.Ldloc, argArray);
                 il.Emit(OpCodes.Callvirt, callRetMethod);
-                if (method.ReturnType.IsValueType && method.ReturnType != typeof(void))
-                    il.Emit(OpCodes.Unbox_Any, method.ReturnType);
-
                 if (method.ReturnType == typeof(void))
                     il.Emit(OpCodes.Pop);
+                else if (method.ReturnType.IsValueType)
+                    il.Emit(OpCodes.Unbox_Any, method.ReturnType);
+                else
+                    il.Emit(OpCodes.Castclass, method.ReturnType);
 
                 il.Emit(OpCodes.Ret);
             }
@@ -272,5 +279,6 @@ public interface IProxyHandler
     /// <param name="method">Information about the method being called.</param>
     /// <param name="args">The arguments passed to the method.</param>
     /// <returns>Result value from the proxy call</returns>
+    /// <remarks>The result must be compatible with the declared return type, including the exact task type for task-returning methods. The active .NET Standard proxy checks reference returns with a cast and value returns by unboxing. Void methods discard the result.</remarks>
     object OnMethod(MethodInfo method, object[] args);
 }
