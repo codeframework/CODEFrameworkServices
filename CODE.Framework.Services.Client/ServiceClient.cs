@@ -159,7 +159,7 @@ public static class ServiceClient
             else if (SettingsCache.ContainsKey(setting))
                 SettingsCache.Remove(setting);
 
-            TransparentProxyGenerator.ClearProxyCache();
+            // Generated proxy types contain no service configuration. New channels receive new handlers.
         }
     }
 

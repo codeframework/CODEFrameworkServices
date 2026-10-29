@@ -7,6 +7,66 @@ namespace CODE.Framework.Services.Tests;
 public class ProxyTests
 {
     [Fact]
+    public void Cached_type_creates_independent_instances_with_the_supplied_handlers()
+    {
+        TransparentProxyGenerator.ClearProxyCache(typeof(IProxyContract));
+        var first = TransparentProxyGenerator.GetProxy<IProxyContract>(new RecordingHandler { Result = 1 });
+        var second = (IProxyContract)TransparentProxyGenerator.GetProxy(typeof(IProxyContract), new RecordingHandler { Result = 2 });
+        Assert.NotSame(first, second);
+        Assert.Same(first.GetType(), second.GetType());
+        Assert.Equal(1, first.Value(0, 0));
+        Assert.Equal(2, second.Value(0, 0));
+    }
+
+    [Fact]
+    public async Task Concurrent_first_use_reuses_one_type_and_keeps_handlers_separate()
+    {
+        TransparentProxyGenerator.ClearProxyCache(typeof(IProxyContract));
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = Enumerable.Range(0, 16).Select(async index =>
+        {
+            await start.Task;
+            return TransparentProxyGenerator.GetProxy<IProxyContract>(new RecordingHandler { Result = index });
+        }).ToArray();
+        start.SetResult();
+        var proxies = await Task.WhenAll(calls).WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Single(proxies.Select(proxy => proxy.GetType()).Distinct());
+        for (var index = 0; index < proxies.Length; index++)
+            Assert.Equal(index, proxies[index].Value(0, 0));
+    }
+
+    [Fact]
+    public void Bypassing_cache_does_not_replace_the_cached_type()
+    {
+        var cached = TransparentProxyGenerator.GetProxy<IProxyContract>(new RecordingHandler());
+        var uncached = TransparentProxyGenerator.GetProxy<IProxyContract>(new RecordingHandler(), useProxyCache: false);
+        var next = TransparentProxyGenerator.GetProxy<IProxyContract>(new RecordingHandler());
+        Assert.NotSame(cached.GetType(), uncached.GetType());
+        Assert.Same(cached.GetType(), next.GetType());
+    }
+
+    [Fact]
+    public void Clearing_type_cache_preserves_existing_instances()
+    {
+        var first = TransparentProxyGenerator.GetProxy<IProxyContract>(new RecordingHandler { Result = 1 });
+        TransparentProxyGenerator.ClearProxyCache(typeof(IProxyContract));
+        var second = TransparentProxyGenerator.GetProxy<IProxyContract>(new RecordingHandler { Result = 2 });
+        Assert.NotSame(first.GetType(), second.GetType());
+        Assert.Equal(1, first.Value(0, 0));
+        Assert.Equal(2, second.Value(0, 0));
+    }
+
+    [Fact]
+    public void Clearing_service_settings_does_not_regenerate_proxy_types()
+    {
+        var first = TransparentProxyGenerator.GetProxy<IProxyContract>(new RecordingHandler());
+        CODE.Framework.Services.Client.ServiceClient.ClearSettingsCache();
+        var second = TransparentProxyGenerator.GetProxy<IProxyContract>(new RecordingHandler());
+        Assert.NotSame(first, second);
+        Assert.Same(first.GetType(), second.GetType());
+    }
+
+    [Fact]
     public void Reference_return_dispatches_exact_method_and_request()
     {
         var request = new CalculationRequest { RequestId = Guid.NewGuid() };

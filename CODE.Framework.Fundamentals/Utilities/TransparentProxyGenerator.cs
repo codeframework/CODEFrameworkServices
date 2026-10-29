@@ -12,14 +12,14 @@ public static class TransparentProxyGenerator
     private static AssemblyBuilder _assemblyBuilder;
     private static ModuleBuilder _moduleBuilder;
     private static readonly object LockDummy = new object();
-    private static readonly Dictionary<Type, object> ProxyCache = new Dictionary<Type, object>();
+    private static readonly Dictionary<Type, Type> ProxyCache = new Dictionary<Type, Type>();
 
     /// <summary>
     /// Returns a proxy for the provided interface
     /// </summary>
     /// <typeparam name="TProxy">Type to be proxied</typeparam>
     /// <param name="handler">The actual handler object that handles all the calls to the proxy.</param>
-    /// <param name="useProxyCache">If true, cached proxies can be reused</param>
+    /// <param name="useProxyCache">If true, the generated proxy type is reused. Every call creates a new instance bound to the supplied handler. If false, a new type is generated without changing the cache.</param>
     /// <returns>
     /// Proxy object
     /// </returns>
@@ -35,7 +35,7 @@ public static class TransparentProxyGenerator
     /// </summary>
     /// <param name="proxyType">Type definition for the proxy</param>
     /// <param name="handler">The actual handler object that handles all the calls to the proxy.</param>
-    /// <param name="useProxyCache">If true, cached proxies can be reused</param>
+    /// <param name="useProxyCache">If true, the generated proxy type is reused. Every call creates a new instance bound to the supplied handler. If false, a new type is generated without changing the cache.</param>
     /// <returns>
     /// Proxy object
     /// </returns>
@@ -44,13 +44,12 @@ public static class TransparentProxyGenerator
     {
         if (!proxyType.IsInterface) throw new ArgumentException("T needs to be an interface");
 
-        if (useProxyCache)
-            lock (ProxyCache)
-                if (ProxyCache.ContainsKey(proxyType))
-                    return ProxyCache[proxyType];
-
         lock (LockDummy)
         {
+            // Cache lookup and generation share a lock so concurrent first use emits only one type.
+            if (useProxyCache && ProxyCache.TryGetValue(proxyType, out var cachedType))
+                return Activator.CreateInstance(cachedType, new object[] { handler }, null);
+
             if (_assemblyBuilder == null)
             {
                 _assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("CODE.Framework.Proxies"), AssemblyBuilderAccess.Run);
@@ -118,29 +117,20 @@ public static class TransparentProxyGenerator
 
             var proxyTypeInfo = typeBuilder.CreateTypeInfo();
             var proxyType2 = proxyTypeInfo.AsType();
-            var proxy = Activator.CreateInstance(proxyType2, new object[] { handler }, null);
             if (useProxyCache)
-            {
-                lock (ProxyCache)
-                {
-                    if (!ProxyCache.ContainsKey(proxyType))
-                        ProxyCache.Add(proxyType, proxy);
-                    else
-                        ProxyCache[proxyType] = proxy;
-                }
-            }
-            return proxy;
+                ProxyCache.Add(proxyType, proxyType2);
+            return Activator.CreateInstance(proxyType2, new object[] { handler }, null);
         }
     }
 
     /// <summary>
-    /// Clears either an individual proxy type (if a proxy type is provided as the parameter),
-    /// or all proxies.
+    /// Removes the generated type for an interface from the cache, or all cached types.
     /// </summary>
-    /// <param name="proxyType">Proxy Type to clear (if not provided, all proxies are cleared).</param>
+    /// <remarks>Existing instances are unaffected. Emitted types are not unloaded; subsequent calls generate new types. Service configuration changes do not require clearing this cache.</remarks>
+    /// <param name="proxyType">Contract interface whose cached type should be removed (if not provided, all cached types are removed).</param>
     public static void ClearProxyCache(Type proxyType = null)
     {
-        lock (ProxyCache)
+        lock (LockDummy)
         {
             if (proxyType == null)
                 ProxyCache.Clear();
