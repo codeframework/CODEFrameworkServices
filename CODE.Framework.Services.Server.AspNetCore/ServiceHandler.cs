@@ -88,6 +88,8 @@ public class ServiceHandler
         if (context.ServiceInstanceConfiguration.HttpsMode == ControllerHttpsMode.RequireHttps && HttpRequest.Scheme != "https")
             throw new UnauthorizedAccessException(Resources.ServiceMustBeAccessedOverHttps);
 
+        if (!await ApiKeyAuthorization.AuthorizeAsync(context, ServiceInstanceConfiguration.ServiceType.GetInterfaces()[0])) return;
+
         if (ServiceInstanceConfiguration.OnAuthorize != null)
             if (!await ServiceInstanceConfiguration.OnAuthorize(context))
                 throw new UnauthorizedAccessException("Not authorized to access this request");

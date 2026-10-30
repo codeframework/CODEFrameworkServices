@@ -31,6 +31,23 @@ public class ServiceHandlerConfiguration
 /// </summary>
 public class ServiceHandlerConfigurationInstance
 {
+    /// <summary>Optional API-key validator. Shared across concurrent requests; must be thread-safe.</summary>
+    public IApiKeyHandler ApiKeyHandler { get; set; }
+
+    private string _apiKeyHeaderName = "X-Api-Key";
+
+    /// <summary>HTTP header containing the API key. Defaults to X-Api-Key.</summary>
+    public string ApiKeyHeaderName
+    {
+        get => _apiKeyHeaderName;
+        set
+        {
+            if (string.IsNullOrEmpty(value) || value.Any(c => !char.IsAsciiLetterOrDigit(c) && !"!#$%&'*+-.^_`|~".Contains(c)))
+                throw new ArgumentException("An API-key header name must be an HTTP token.", nameof(value));
+            _apiKeyHeaderName = value;
+        }
+    }
+
     private string _displayName;
     private string _displayVersion;
 

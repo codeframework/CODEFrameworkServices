@@ -31,6 +31,9 @@ public class OpenApiInfo
 
 public class OpenApiPathInfo
 {
+    /// <summary>Optional API-key security scheme required by this operation.</summary>
+    public string ApiKeySecurityScheme { get; set; }
+
     private readonly string _path;
     private readonly Dictionary<string, OpenApiVerb> _verbs = [];
 
@@ -175,6 +178,11 @@ public class ExternalCodeDocumentation
     public string Url { get; set; } = string.Empty;
 }
 
+internal class ApiKeyOpenApiComponents : Dictionary<string, OpenApiSchemaDefinition>
+{
+    internal Dictionary<string, string> SecuritySchemes { get; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
 public class ComponentsJsonConverter : JsonConverter<Dictionary<string, OpenApiSchemaDefinition>>
 {
     public override Dictionary<string, OpenApiSchemaDefinition> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -240,6 +248,19 @@ public class ComponentsJsonConverter : JsonConverter<Dictionary<string, OpenApiS
             writer.WriteEndObject(); // components object
         }
         writer.WriteEndObject(); // schemas
+        if (value is ApiKeyOpenApiComponents components && components.SecuritySchemes.Count > 0)
+        {
+            writer.WriteStartObject("securitySchemes");
+            foreach (var scheme in components.SecuritySchemes)
+            {
+                writer.WriteStartObject(scheme.Value);
+                writer.WriteString("type", "apiKey");
+                writer.WriteString("in", "header");
+                writer.WriteString("name", scheme.Key);
+                writer.WriteEndObject();
+            }
+            writer.WriteEndObject();
+        }
         writer.WriteEndObject();
     }
 
@@ -470,6 +491,16 @@ public class PathJsonConverter : JsonConverter<Dictionary<string, OpenApiPathInf
             {
                 writer.WriteStartObject(verb);
 
+                if (path.ApiKeySecurityScheme != null)
+                {
+                    writer.WriteStartArray("security");
+                    writer.WriteStartObject();
+                    writer.WriteStartArray(path.ApiKeySecurityScheme);
+                    writer.WriteEndArray();
+                    writer.WriteEndObject();
+                    writer.WriteEndArray();
+                }
+
                 var verbObject = path.Verbs[verb];
                 writer.WritePropertyName("operationId");
                 writer.WriteStringValue(verbObject.OperationId);
@@ -571,6 +602,20 @@ public class PathJsonConverter : JsonConverter<Dictionary<string, OpenApiPathInf
                 writer.WriteEndObject();
                 writer.WriteEndObject();
                 writer.WriteEndObject();
+                if (path.ApiKeySecurityScheme != null)
+                {
+                    writer.WriteStartObject("401");
+                    writer.WriteString("description", "API key missing or rejected.");
+                    writer.WriteStartObject("headers");
+                    writer.WriteStartObject("WWW-Authenticate");
+                    writer.WriteString("description", "API-key authentication challenge.");
+                    writer.WriteStartObject("schema");
+                    writer.WriteString("type", "string");
+                    writer.WriteEndObject();
+                    writer.WriteEndObject();
+                    writer.WriteEndObject();
+                    writer.WriteEndObject();
+                }
                 writer.WriteEndObject();
 
                 writer.WriteStartArray("tags");

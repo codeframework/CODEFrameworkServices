@@ -8,7 +8,7 @@ namespace CODE.Framework.Services.Tests;
 [ServiceContract]
 public interface ITestService
 {
-    [OperationContract]
+    [OperationContract, AiTool(Name = "calculate", Description = "Calculate the sum of two numbers.")]
     CalculationResponse Calculate(CalculationRequest request);
 
     [OperationContract, Rest(Method = RestMethods.Get, Name = "lookup")]

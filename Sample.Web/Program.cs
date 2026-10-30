@@ -30,6 +30,7 @@ builder.Services.AddHostedServices(config =>
             ServiceTypeName = "Sample.Services.Implementation.CustomerService", // dynamically loaded type by specifying the name in a string
             AssemblyName = "Sample.Services.Implementation", // framework needs to load assembly
             RouteBasePath = "/api/customers",
+            ApiKeyHandler = new CustomerApiKeyHandler(builder.Configuration["CustomerApiKey"]),
             JsonFormatMode = JsonFormatModes.ProperCase, // proper-case formats JSON like FirstName
             OnAuthorize = context =>
             {

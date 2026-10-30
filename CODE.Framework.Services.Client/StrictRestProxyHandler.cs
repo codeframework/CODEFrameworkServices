@@ -9,6 +9,7 @@ internal class StrictRestProxyHandler(Uri serviceUri, ServiceCallOptions options
 {
     // Cookie state must not leak between unrelated calls sharing this client.
     private static readonly HttpClient Client = new(new HttpClientHandler { UseCookies = false });
+    private static readonly HttpClient KeyedClient = new(new HttpClientHandler { UseCookies = false, AllowAutoRedirect = false });
 
     public object OnMethod(MethodInfo method, object[] args)
     {
@@ -56,8 +57,10 @@ internal class StrictRestProxyHandler(Uri serviceUri, ServiceCallOptions options
             try
             {
                 using var message = new HttpRequestMessage(new HttpMethod(httpMethod), url);
+                if (!string.IsNullOrEmpty(options.ApiKey)) message.Headers.Add(options.ApiKeyHeaderName, options.ApiKey);
                 if (payload != null) message.Content = new StringContent(payload, Encoding.UTF8, "application/json");
-                using var response = await Client.SendAsync(message, HttpCompletionOption.ResponseContentRead, token).ConfigureAwait(false);
+                var client = string.IsNullOrEmpty(options.ApiKey) ? Client : KeyedClient;
+                using var response = await client.SendAsync(message, HttpCompletionOption.ResponseContentRead, token).ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode)
                 {
                     try { response.EnsureSuccessStatusCode(); }

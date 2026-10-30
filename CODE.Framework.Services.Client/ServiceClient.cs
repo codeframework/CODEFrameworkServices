@@ -151,6 +151,8 @@ public static class ServiceClient
             {
                 case Protocol.RestHttpJson:
                     var url = string.IsNullOrEmpty(restServiceUrl) ? GetSetting($"RestServiceUrl:{GetServiceId<TServiceType>()}") : restServiceUrl;
+                    snapshot.ApiKey ??= GetSetting($"RestServiceApiKey:{GetServiceId<TServiceType>()}");
+                    snapshot.ApiKeyHeaderName ??= GetSetting($"RestServiceApiKeyHeaderName:{GetServiceId<TServiceType>()}", defaultValue: "X-Api-Key");
                     return TransparentProxyGenerator.GetProxy<TServiceType>(new StrictRestProxyHandler(new Uri(url), snapshot, asyncOperations));
                 case Protocol.InProcess:
                     var service = ServiceGardenLocal.GetService<TServiceType>() ?? throw new InvalidOperationException($"No in-process service is registered for {typeof(TServiceType).FullName}.");
@@ -227,7 +229,11 @@ public static class ServiceClient
             case Protocol.RestHttpJson:
                 var serviceId3 = GetServiceId<TServiceType>();
                 var restUri = string.IsNullOrEmpty(restUrl) ? new Uri(GetSetting($"RestServiceUrl:{serviceId3}")) : new Uri(restUrl);
-                var restHandler = new RestProxyHandler(restUri);
+                var restHandler = new RestProxyHandler(restUri)
+                {
+                    ApiKey = GetSetting($"RestServiceApiKey:{serviceId3}"),
+                    ApiKeyHeaderName = GetSetting($"RestServiceApiKeyHeaderName:{serviceId3}", defaultValue: "X-Api-Key")
+                };
                 var proxy = TransparentProxyGenerator.GetProxy<TServiceType>(restHandler);
                 return proxy;
             default:

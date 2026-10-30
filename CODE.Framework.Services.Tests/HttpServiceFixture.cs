@@ -25,6 +25,8 @@ public class HttpServiceFixture : IAsyncLifetime
     public AsyncServiceState AsyncState { get; } = new();
     public string ServiceUrl { get; private set; }
     public Func<HttpContext, Task<bool>> InterceptRequest { get; set; }
+    public ServiceHandlerConfigurationInstance TestConfiguration { get; private set; }
+    public ServiceHandlerConfigurationInstance AsyncConfiguration { get; private set; }
 
     public async Task InitializeAsync()
     {
@@ -37,8 +39,11 @@ public class HttpServiceFixture : IAsyncLifetime
         builder.Services.AddHostedServices(config =>
         {
             config.Services.Clear();
-            config.Services.Add(new ServiceHandlerConfigurationInstance { ServiceType = typeof(TestService), RouteBasePath = "/test" });
-            config.Services.Add(new ServiceHandlerConfigurationInstance { ServiceType = typeof(AsyncTestService), RouteBasePath = "/async" });
+            config.Cors.AllowedHeaders = "Content-Type,X-Api-Key,Customer-Key,Async-Key";
+            TestConfiguration = new ServiceHandlerConfigurationInstance { ServiceType = typeof(TestService), RouteBasePath = "/test" };
+            AsyncConfiguration = new ServiceHandlerConfigurationInstance { ServiceType = typeof(AsyncTestService), RouteBasePath = "/async" };
+            config.Services.Add(TestConfiguration);
+            config.Services.Add(AsyncConfiguration);
         });
         _app = builder.Build();
         _app.Use(async (context, next) =>
@@ -47,6 +52,8 @@ public class HttpServiceFixture : IAsyncLifetime
             if (interceptor == null || !await interceptor(context)) await next(context);
         });
         _app.UseServiceHandler();
+        _app.UseOpenApiHandler();
+        _app.UseMcpHandler();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         await _app.StartAsync(timeout.Token);
         var addresses = _app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>();

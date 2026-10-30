@@ -875,6 +875,22 @@ public static class ServiceHandlerExtensions
         var (Service, Operation) = toolMatches[0];
         var operation = Operation;
         var serviceConfiguration = Service.Configuration;
+        var apiKeyContext = new ServiceHandlerRequestContext
+        {
+            HttpContext = request.HttpContext,
+            HttpRequest = request,
+            HttpResponse = response,
+            ServiceInstanceConfiguration = serviceConfiguration,
+            MethodContext = new MethodInvocationContext(operation.Method, ServiceHandlerConfiguration.Current, serviceConfiguration),
+            Url = new ServiceHandlerRequestContextUrl
+            {
+                Url = request.GetDisplayUrl(),
+                UrlPath = request.Path.Value,
+                QueryString = request.QueryString,
+                HttpMethod = request.Method.ToUpperInvariant()
+            }
+        };
+        if (!await ApiKeyAuthorization.AuthorizeAsync(apiKeyContext, Service.ContractType)) return;
         var methodParameters = operation.Method.GetParameters();
         if (methodParameters.Length > 1)
         {
@@ -938,23 +954,9 @@ public static class ServiceHandlerExtensions
             var principal = request.HttpContext.User;
             UserPrincipalHelper.AddPrincipal(serviceInstance, principal);
 
-            var methodContext = new MethodInvocationContext(operation.Method, ServiceHandlerConfiguration.Current, serviceConfiguration);
+            var methodContext = apiKeyContext.MethodContext;
             ValidateMcpToolRoles(methodContext.AuthorizationRoles, principal);
-            var requestContext = new ServiceHandlerRequestContext
-            {
-                HttpContext = request.HttpContext,
-                HttpRequest = request,
-                HttpResponse = response,
-                ServiceInstanceConfiguration = serviceConfiguration,
-                MethodContext = methodContext,
-                Url = new ServiceHandlerRequestContextUrl
-                {
-                    Url = request.GetDisplayUrl(),
-                    UrlPath = request.Path.Value,
-                    QueryString = request.QueryString,
-                    HttpMethod = request.Method.ToUpperInvariant()
-                }
-            };
+            var requestContext = apiKeyContext;
 
             if (serviceConfiguration.OnAuthorize != null && !await serviceConfiguration.OnAuthorize(requestContext))
                 throw new UnauthorizedAccessException("Not authorized to call this tool.");
@@ -1562,7 +1564,8 @@ public static class ServiceHandlerExtensions
         resp.ContentType = "application/json; charset=utf-8";
 
         info ??= new OpenApiInfo();
-        var openApiInfo = new OpenApiInformation { Info = info };
+        var components = new ApiKeyOpenApiComponents();
+        var openApiInfo = new OpenApiInformation { Info = info, Components = components };
         var serviceDescriptions = GetHostedServiceDescriptions(serviceInstanceConfigurations);
         var xmlDocumentationFiles = GetXmlDocumentationFiles(serviceDescriptions);
 
@@ -1580,6 +1583,16 @@ public static class ServiceHandlerExtensions
 
             foreach (var operation in serviceDescription.Operations)
             {
+                if (serviceDescription.Configuration.ApiKeyHandler != null)
+                {
+                    var headerName = serviceDescription.Configuration.ApiKeyHeaderName;
+                    if (!components.SecuritySchemes.TryGetValue(headerName, out var schemeName))
+                    {
+                        schemeName = "ApiKey" + (components.SecuritySchemes.Count + 1);
+                        components.SecuritySchemes.Add(headerName, schemeName);
+                    }
+                    operation.ApiKeySecurityScheme = schemeName;
+                }
                 operation.Tags.Add(new OpenApiTag { Name = serviceDescription.Configuration.ServiceType.Name });
 
                 var returnTypeOpenApiString = OpenApiHelper.GetOpenApiType(operation.ReturnType);

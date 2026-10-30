@@ -3,6 +3,12 @@ namespace CODE.Framework.Services.Client;
 /// <summary>Options for the opt-in client overload. Values are copied at the start of a call.</summary>
 public class ServiceCallOptions
 {
+    /// <summary>Overrides RestServiceApiKey:ContractName. Null uses configuration; empty omits the key.</summary>
+    public string ApiKey { get; set; }
+
+    /// <summary>Overrides RestServiceApiKeyHeaderName:ContractName. Null uses configuration or X-Api-Key.</summary>
+    public string ApiKeyHeaderName { get; set; }
+
     /// <summary>Controls final failures. Cancellation always propagates.</summary>
     public ServiceExceptionBehavior ExceptionBehavior { get; set; } = ServiceExceptionBehavior.Propagate;
 
@@ -26,6 +32,8 @@ public class ServiceCallOptions
         if (RetryDelay < TimeSpan.Zero || RetryDelay.TotalMilliseconds > int.MaxValue) throw new ArgumentOutOfRangeException(nameof(RetryDelay));
         return new ServiceCallOptions
         {
+            ApiKey = ApiKey,
+            ApiKeyHeaderName = ApiKeyHeaderName,
             ExceptionBehavior = ExceptionBehavior,
             MaxAttempts = MaxAttempts,
             RetryDelay = RetryDelay,

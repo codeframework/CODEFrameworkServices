@@ -9,6 +9,12 @@
 /// <param name="serviceUri">The service root URI.</param>
 public class RestProxyHandler(Uri serviceUri) : IProxyHandler
 {
+    /// <summary>API key sent on this channel's HTTP requests. Null or empty omits the header.</summary>
+    public string ApiKey { get; set; }
+
+    /// <summary>Header containing the API key. Defaults to X-Api-Key.</summary>
+    public string ApiKeyHeaderName { get; set; } = "X-Api-Key";
+
     private readonly Uri _serviceUri = serviceUri;
     private Type _contractType;
 
@@ -49,7 +55,7 @@ public class RestProxyHandler(Uri serviceUri) : IProxyHandler
                 // File response from a REST/HTTP call is a special case, as it returns the raw file. 
                 // To make everything work transparently, we thus re-assembly a file response object here.
                 var fileResponseContent = new byte[0];
-                using var client = new WebClient();
+                using var client = CreateWebClient();
                 client.Headers.Add("Content-Type", "application/json; charset=utf-8");
                 client.Encoding = Encoding.UTF8;
                 switch (httpMethod)
@@ -91,7 +97,7 @@ public class RestProxyHandler(Uri serviceUri) : IProxyHandler
             }
             else
             {
-                using var client = new WebClient();
+                using var client = CreateWebClient();
                 client.Headers.Add("Content-Type", "application/json; charset=utf-8");
                 client.Encoding = Encoding.UTF8;
                 var serializedData = RestHelper.SerializeToUrlParameters(data, httpMethod);
@@ -109,6 +115,34 @@ public class RestProxyHandler(Uri serviceUri) : IProxyHandler
         {
             if (ServiceClient.LogCommunicationErrors) LoggingMediator.Log($"Unable to communicate with service at endpoint '{serviceUriAbsoluteUri}' [{httpMethod}].{Environment.NewLine}{Environment.NewLine}", ex);
             throw new CommunicationException("Unable to communicate with REST service.", ex);
+        }
+    }
+
+    private WebClient CreateWebClient()
+    {
+        var client = new ApiKeyWebClient { HasApiKey = !string.IsNullOrEmpty(ApiKey) };
+        if (client.HasApiKey) client.Headers.Add(ApiKeyHeaderName, ApiKey);
+        return client;
+    }
+
+    // Custom headers are otherwise forwarded automatically when WebClient follows redirects.
+    private class ApiKeyWebClient : WebClient
+    {
+        internal bool HasApiKey { get; set; }
+
+        protected override WebRequest GetWebRequest(Uri address)
+        {
+            var request = base.GetWebRequest(address);
+            if (HasApiKey && request is HttpWebRequest httpRequest) httpRequest.AllowAutoRedirect = false;
+            return request;
+        }
+
+        protected override WebResponse GetWebResponse(WebRequest request)
+        {
+            var response = base.GetWebResponse(request);
+            if (HasApiKey && response is HttpWebResponse httpResponse && (int)httpResponse.StatusCode >= 300 && (int)httpResponse.StatusCode < 400)
+                throw new WebException("Automatic redirects are disabled for API-key requests.", null, WebExceptionStatus.ProtocolError, response);
+            return response;
         }
     }
 }
