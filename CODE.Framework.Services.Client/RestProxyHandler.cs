@@ -120,8 +120,11 @@ public class RestProxyHandler(Uri serviceUri) : IProxyHandler
 
     private WebClient CreateWebClient()
     {
-        var client = new ApiKeyWebClient { HasApiKey = !string.IsNullOrEmpty(ApiKey) };
-        if (client.HasApiKey) client.Headers.Add(ApiKeyHeaderName, ApiKey);
+        if (string.IsNullOrEmpty(ApiKey))
+            return new WebClient();
+
+        var client = new ApiKeyWebClient { HasApiKey = true };
+        client.Headers.Add(ApiKeyHeaderName, ApiKey);
         return client;
     }
 
