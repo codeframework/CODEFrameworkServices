@@ -2,22 +2,8 @@
 
 	<PropertyGroup>
 		<TargetFrameworks>netstandard2.0</TargetFrameworks>
-		<LangVersion>Latest</LangVersion>
-		<AssemblyVersion>2.0.20.0</AssemblyVersion>
-		<FileVersion>2.0.20.0</FileVersion>
-		<Version>2.0.20</Version>
-		<Authors>Markus Egger Inc.</Authors>
-		<Company>Markus Egger Inc.</Company>
-		<Product>CODE Framework</Product>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-		<PackageLicenseExpression>MIT</PackageLicenseExpression>
-		<RepositoryUrl>https://github.com/MarkusEggerInc/CODEFrameworkCore</RepositoryUrl>
-		<RepositoryType>Git</RepositoryType>
-		<Copyright>Markus Egger Inc., 2017-2023</Copyright>
 		<Description>Base contracts for the CODE Framework Server side services</Description>
-		<PackageIconUrl>http://www.codemag.com/Images/Logos/CodeFramework_Small.png</PackageIconUrl>
-		<PackageIcon>CODEFrameworkLogoSmall.png</PackageIcon>
-		<PackageProjectUrl>https://codeframework.io</PackageProjectUrl>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -36,7 +22,7 @@
   </ItemGroup>-->
 
 	<ItemGroup>
-		<PackageReference Include="System.ServiceModel.Primitives" Version="8.1.2" />
+		<PackageReference Include="System.ServiceModel.Primitives" Version="10.1.0" />
 	</ItemGroup>
 	<!--<PropertyGroup Condition=" '$(TargetFramework)' == 'net45'">
     <DefineConstants>NET45;NETFULL</DefineConstants>

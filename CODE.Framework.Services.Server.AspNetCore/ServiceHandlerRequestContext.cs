@@ -18,7 +18,7 @@ public class ServiceHandlerRequestContext
 
     public string ResultJson { get; set; }
 
-    public ServiceHandlerRequestContextUrl Url { get; set; } = new ServiceHandlerRequestContextUrl();
+    public ServiceHandlerRequestContextUrl Url { get; set; } = new();
 
     public MethodInvocationContext MethodContext { get; internal set; }
 }

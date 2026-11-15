@@ -1,50 +1,45 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.Globalization;
+﻿using System.Diagnostics;
 
-namespace CODE.Framework.Fundamentals.Utilities.Csv
+namespace CODE.Framework.Fundamentals.Utilities.Csv;
+
+public partial class CachedCsvReader
 {
-    public partial class CachedCsvReader
+    /// <summary>
+    /// Represents a CSV record comparer.
+    /// </summary>
+    private class CsvRecordComparer : IComparer<string[]>
     {
         /// <summary>
-        /// Represents a CSV record comparer.
+        /// Contains the field index of the values to compare.
         /// </summary>
-        private class CsvRecordComparer : IComparer<string[]>
+        private readonly int _field;
+
+        /// <summary>
+        /// Contains the sort direction.
+        /// </summary>
+        private readonly ListSortDirection _direction;
+
+        /// <summary>
+        /// Initializes a new instance of the CsvRecordComparer class.
+        /// </summary>
+        /// <param name="field">The field index of the values to compare.</param>
+        /// <param name="direction">The sort direction.</param>
+        public CsvRecordComparer(int field, ListSortDirection direction)
         {
-            /// <summary>
-            /// Contains the field index of the values to compare.
-            /// </summary>
-            private readonly int _field;
+            if (field < 0)
+                throw new ArgumentOutOfRangeException("field", field, string.Format(CultureInfo.InvariantCulture, "FieldIndexOutOfRange", field));
 
-            /// <summary>
-            /// Contains the sort direction.
-            /// </summary>
-            private readonly ListSortDirection _direction;
+            _field = field;
+            _direction = direction;
+        }
 
-            /// <summary>
-            /// Initializes a new instance of the CsvRecordComparer class.
-            /// </summary>
-            /// <param name="field">The field index of the values to compare.</param>
-            /// <param name="direction">The sort direction.</param>
-            public CsvRecordComparer(int field, ListSortDirection direction)
-            {
-                if (field < 0)
-                    throw new ArgumentOutOfRangeException("field", field, string.Format(CultureInfo.InvariantCulture, "FieldIndexOutOfRange", field));
+        public int Compare(string[] x, string[] y)
+        {
+            Debug.Assert(x != null && y != null && x.Length == y.Length && _field < x.Length);
 
-                _field = field;
-                _direction = direction;
-            }
+            var result = string.Compare(x[_field], y[_field], StringComparison.CurrentCulture);
 
-            public int Compare(string[] x, string[] y)
-            {
-                Debug.Assert(x != null && y != null && x.Length == y.Length && _field < x.Length);
-
-                var result = string.Compare(x[_field], y[_field], StringComparison.CurrentCulture);
-
-                return _direction == ListSortDirection.Ascending ? result : -result;
-            }
+            return _direction == ListSortDirection.Ascending ? result : -result;
         }
     }
 }

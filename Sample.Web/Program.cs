@@ -7,46 +7,45 @@ builder.Services.AddHostedServices(config =>
 
     // This is an example of configuring hosted services in code. This can also be done in appsettings.json
     // The two services hosted in this API example deliberately set a variety of options for demonstration purposes.
-    config.Services.AddRange(new List<ServiceHandlerConfigurationInstance>
-    {
-        new ServiceHandlerConfigurationInstance
-        {
+    config.Services.AddRange(
+    [
+        new() {
             ServiceType = typeof(UserService), // Using an explicit Type, which also implies the assembly the type is in
             RouteBasePath = "/api/users",
             JsonFormatMode = JsonFormatModes.CamelCase, // camel-case formats JSON like firstName
             OnAuthorize = context =>
             {
                 // fake a user context 
-                context.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(new[]
-                {
+                context.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+                [
                     new Claim("Permission", "CanViewPage"),
                     new Claim(ClaimTypes.Role, "Administrator"),
                     new Claim(ClaimTypes.NameIdentifier, "Markus E. User")
-                }, "Basic"));
+                ], "Basic"));
 
                 return Task.FromResult(true);
             }
         },
-        new ServiceHandlerConfigurationInstance
-        {
+        new() {
             ServiceTypeName = "Sample.Services.Implementation.CustomerService", // dynamically loaded type by specifying the name in a string
             AssemblyName = "Sample.Services.Implementation", // framework needs to load assembly
             RouteBasePath = "/api/customers",
+            ApiKeyHandler = new CustomerApiKeyHandler(builder.Configuration["CustomerApiKey"]),
             JsonFormatMode = JsonFormatModes.ProperCase, // proper-case formats JSON like FirstName
             OnAuthorize = context =>
             {
                 // fake a user context 
-                context.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(new[]
-                {
+                context.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+                [
                     new Claim("Permission", "CanViewPage"),
                     new Claim(ClaimTypes.Role, "Administrators"),
                     new Claim(ClaimTypes.NameIdentifier, "Markus E. Customer")
-                }, "Basic"));
+                ], "Basic"));
 
                 return Task.FromResult(true);
             }
         }
-    });
+    ]);
 
     // These are the defaults anyway, but they could manually be set to something different
     //config.Cors.UseCorsPolicy = true;
@@ -61,9 +60,6 @@ var app = builder.Build();
 
 // Showing some extra info in dev-mode
 if (builder.Environment.IsDevelopment()) app.ShowExtendedFailureInformation();
-
-// Enabled the CODE Framework service hosting environment
-app.UseServiceHandler(); 
 
 // Add CODE Framework OpenAPI support
 app.UseOpenApiHandler(info: new OpenApiInfo
@@ -80,5 +76,11 @@ app.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/openapi.json", "Service Description");
 });
+
+// Enabled the CODE Framework REST service hosting environment
+app.UseServiceHandler();
+
+// Enable the CODE Framework Message Communication Protocol (MCP) hosting environment (for AI and other clients that use the MCP protocol)
+app.UseMcpHandler();
 
 app.Run();

@@ -1,5 +1,7 @@
 ﻿namespace CODE.Framework.Services.Client;
 
+using System.Threading.Tasks;
+
 public static class ServiceClient
 {
     static ServiceClient()
@@ -9,16 +11,20 @@ public static class ServiceClient
     }
 
     /// <summary>Internal message size cache</summary>
-    private static readonly Dictionary<string, MessageSize> CachedMessageSizes = new Dictionary<string, MessageSize>();
+    private static readonly Dictionary<string, MessageSize> CachedMessageSizes = [];
 
     /// <summary>Cached protocols</summary>
-    private static readonly Dictionary<string, Protocol> CachedProtocols = new Dictionary<string, Protocol>();
+    private static readonly Dictionary<string, Protocol> CachedProtocols = [];
 
     /// <summary>The cached service ids</summary>
-    private static readonly Dictionary<Type, string> CachedServiceIds = new Dictionary<Type, string>();
+    private static readonly Dictionary<Type, string> CachedServiceIds = [];
 
     /// <summary>Internal settings cache</summary>
-    private static readonly Dictionary<string, string> SettingsCache = new Dictionary<string, string>();
+    private static readonly Dictionary<string, string> SettingsCache = [];
+
+    // Keep channel configuration resolution atomic with cache invalidation. Network calls
+    // occur on the returned channel, outside this lock.
+    private static readonly object ConfigurationCacheLock = new();
 
     /// <summary>
     /// Indicates whether configuration settings should be cached (default = yes)
@@ -72,13 +78,98 @@ public static class ServiceClient
         }
     }
 
+    /// <summary>Calls a service with explicit failure handling and per-operation retry options.</summary>
+    /// <remarks>Unlike the legacy overload, defaults to propagating exceptions and ignores the global legacy retry settings. Cancellation always propagates. The callback runs once; only explicitly repeatable REST operations can be retried.</remarks>
+    public static void Call<TServiceType>(ServiceCallOptions options, Action<TServiceType> action, string restServiceUrl = null) where TServiceType : class
+    {
+        if (options == null) throw new ArgumentNullException(nameof(options));
+        if (action == null) throw new ArgumentNullException(nameof(action));
+        var snapshot = options.Snapshot();
+        snapshot.CancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var channel = CreateOptionsChannel<TServiceType>(snapshot, restServiceUrl, false);
+            action(channel);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch when (snapshot.ExceptionBehavior == ServiceExceptionBehavior.Suppress)
+        {
+            // Explicit opt-in to suppression; the callback is never replayed.
+        }
+    }
+
+    /// <summary>Awaits a callback using Task&lt;TResponse&gt; contract operations. Failures propagate by default; no retries are enabled.</summary>
+    public static Task CallAsync<TServiceType>(Func<TServiceType, Task> action, string restServiceUrl = null) where TServiceType : class
+        => CallAsync(new ServiceCallOptions(), action, restServiceUrl);
+
+    /// <summary>Awaits a callback with explicit cancellation, exception, and per-operation REST retry options.</summary>
+    /// <remarks>The callback starts on the calling context and runs once. Await its service operations; do not start unobserved work. Cancellation always propagates.</remarks>
+    public static async Task CallAsync<TServiceType>(ServiceCallOptions options, Func<TServiceType, Task> action, string restServiceUrl = null) where TServiceType : class
+    {
+        if (options == null) throw new ArgumentNullException(nameof(options));
+        if (action == null) throw new ArgumentNullException(nameof(action));
+        var snapshot = options.Snapshot();
+        snapshot.CancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var channel = CreateOptionsChannel<TServiceType>(snapshot, restServiceUrl, true);
+            await action(channel).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch when (snapshot.ExceptionBehavior == ServiceExceptionBehavior.Suppress) { }
+    }
+
+    /// <summary>Awaits a callback and returns its result. Contract operations must return Task&lt;TResponse&gt;.</summary>
+    public static Task<TResult> CallAsync<TServiceType, TResult>(Func<TServiceType, Task<TResult>> action, string restServiceUrl = null) where TServiceType : class
+        => CallAsync(new ServiceCallOptions(), action, restServiceUrl);
+
+    /// <summary>Awaits a result-producing callback with explicit service-call options.</summary>
+    /// <remarks>Explicit suppression returns default(TResult) on failure. Cancellation always propagates. Legacy retry settings do not apply.</remarks>
+    public static async Task<TResult> CallAsync<TServiceType, TResult>(ServiceCallOptions options, Func<TServiceType, Task<TResult>> action, string restServiceUrl = null) where TServiceType : class
+    {
+        if (options == null) throw new ArgumentNullException(nameof(options));
+        if (action == null) throw new ArgumentNullException(nameof(action));
+        var snapshot = options.Snapshot();
+        snapshot.CancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var channel = CreateOptionsChannel<TServiceType>(snapshot, restServiceUrl, true);
+            return await action(channel).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch when (snapshot.ExceptionBehavior == ServiceExceptionBehavior.Suppress) { return default; }
+    }
+
+    private static TServiceType CreateOptionsChannel<TServiceType>(ServiceCallOptions snapshot, string restServiceUrl, bool asyncOperations) where TServiceType : class
+    {
+        lock (ConfigurationCacheLock)
+        {
+            switch (GetProtocol<TServiceType>())
+            {
+                case Protocol.RestHttpJson:
+                    var url = string.IsNullOrEmpty(restServiceUrl) ? GetSetting($"RestServiceUrl:{GetServiceId<TServiceType>()}") : restServiceUrl;
+                    snapshot.ApiKey ??= GetSetting($"RestServiceApiKey:{GetServiceId<TServiceType>()}");
+                    snapshot.ApiKeyHeaderName ??= GetSetting($"RestServiceApiKeyHeaderName:{GetServiceId<TServiceType>()}", defaultValue: "X-Api-Key");
+                    return TransparentProxyGenerator.GetProxy<TServiceType>(new StrictRestProxyHandler(new Uri(url), snapshot, asyncOperations));
+                case Protocol.InProcess:
+                    var service = ServiceGardenLocal.GetService<TServiceType>() ?? throw new InvalidOperationException($"No in-process service is registered for {typeof(TServiceType).FullName}.");
+                    return TransparentProxyGenerator.GetProxy<TServiceType>(new StrictInProcessProxyHandler(service, snapshot.CancellationToken, asyncOperations));
+                default:
+                    throw new NotSupportedException($"The configured protocol for {typeof(TServiceType).FullName} is not supported by the options-based client.");
+            }
+        }
+    }
+
     public static bool AutoRetryFailedCalls { get; set; } = false;
 
     /// <summary>Defines the delay (milliseconds) between auto-retry calls</summary>
     /// <remarks>The delay is defined in milliseconds (-1 = no delay). Note that the delay puts the thread to sleep, so this should not be done on foreground threads.</remarks>
     public static int AutoRetryDelay { get; set; } = -1;
 
-    /// <summary>Defines the list of exception types for which to auto-retry calls</summary>
+    /// <summary>Defines exact exception types for legacy callback retries. Null or empty retries any callback exception once.</summary>
     public static List<Type> AutoRetryFailedCallsForExceptions { get; set; } // TODO: = new List<Type> { typeof (EndpointNotFoundException), typeof (ServerTooBusyException) };
 
     /// <summary>When set to true (non-default), service communication errors are forwarded to the logging mediator.</summary>
@@ -90,15 +181,10 @@ public static class ServiceClient
     private static bool MustRetryCall(Exception exception)
     {
         if (!AutoRetryFailedCalls) return false;
-        if (AutoRetryFailedCallsForExceptions.Count == 0) return true;
-
-        if (AutoRetryFailedCallsForExceptions.Any(exceptionType => exception.GetType() == exceptionType))
-        {
-            if (AutoRetryDelay > 0) Thread.Sleep(AutoRetryDelay);
-            return true;
-        }
-
-        return false;
+        var exceptionTypes = AutoRetryFailedCallsForExceptions;
+        if (exceptionTypes != null && exceptionTypes.Count > 0 && !exceptionTypes.Any(exceptionType => exception.GetType() == exceptionType)) return false;
+        if (AutoRetryDelay > 0) Thread.Sleep(AutoRetryDelay);
+        return true;
     }
 
     /// <summary>
@@ -117,6 +203,12 @@ public static class ServiceClient
     /// Creates a channel exclusive to this caller. It is up to the caller to close the channel after use!
     /// </remarks>
     public static TServiceType GetChannelDedicated<TServiceType>(string restUrl = null) where TServiceType : class
+    {
+        lock (ConfigurationCacheLock)
+            return CreateChannel<TServiceType>(restUrl);
+    }
+
+    private static TServiceType CreateChannel<TServiceType>(string restUrl) where TServiceType : class
     {
         switch (GetProtocol<TServiceType>())
         {
@@ -137,7 +229,11 @@ public static class ServiceClient
             case Protocol.RestHttpJson:
                 var serviceId3 = GetServiceId<TServiceType>();
                 var restUri = string.IsNullOrEmpty(restUrl) ? new Uri(GetSetting($"RestServiceUrl:{serviceId3}")) : new Uri(restUrl);
-                var restHandler = new RestProxyHandler(restUri);
+                var restHandler = new RestProxyHandler(restUri)
+                {
+                    ApiKey = GetSetting($"RestServiceApiKey:{serviceId3}"),
+                    ApiKeyHeaderName = GetSetting($"RestServiceApiKeyHeaderName:{serviceId3}", defaultValue: "X-Api-Key")
+                };
                 var proxy = TransparentProxyGenerator.GetProxy<TServiceType>(restHandler);
                 return proxy;
             default:
@@ -146,20 +242,43 @@ public static class ServiceClient
     }
 
     /// <summary>
-    /// Clears either an individual setting (if a setting name is provided as the parameter),
-    /// or all settings.
+    /// Clears a cached setting and its derived protocol selection, or all client configuration caches.
     /// </summary>
     /// <param name="setting">Setting to clear (if not provided, all settings are cleared).</param>
+    /// <remarks>
+    /// Clearing ServiceProtocol invalidates all resolved protocols; contract overrides remain in effect.
+    /// Clearing ServiceProtocol:ContractName invalidates only that contract's resolved protocol.
+    /// Other named settings leave unrelated cached settings intact. Null or empty clears all caches.
+    /// Existing channels and generated proxy types are unaffected; new channels use refreshed settings.
+    /// This does not reload properties initialized once from configuration, such as LogCommunicationErrors.
+    /// </remarks>
     public static void ClearSettingsCache(string setting = null)
     {
-        lock (SettingsCache)
+        lock (ConfigurationCacheLock)
         {
             if (string.IsNullOrEmpty(setting))
-                SettingsCache.Clear();
-            else if (SettingsCache.ContainsKey(setting))
-                SettingsCache.Remove(setting);
-
-            TransparentProxyGenerator.ClearProxyCache();
+            {
+                lock (SettingsCache)
+                    SettingsCache.Clear();
+                lock (CachedProtocols)
+                    CachedProtocols.Clear();
+                lock (CachedServiceIds)
+                    CachedServiceIds.Clear();
+                lock (CachedMessageSizes)
+                    CachedMessageSizes.Clear();
+            }
+            else
+            {
+                lock (SettingsCache)
+                    SettingsCache.Remove(setting);
+                lock (CachedProtocols)
+                {
+                    if (setting == "ServiceProtocol")
+                        CachedProtocols.Clear();
+                    else if (setting.StartsWith("ServiceProtocol:", StringComparison.Ordinal))
+                        CachedProtocols.Remove(setting);
+                }
+            }
         }
     }
 
@@ -182,32 +301,15 @@ public static class ServiceClient
         if (string.IsNullOrEmpty(protocolName)) protocolName = GetSetting("ServiceProtocol").ToLower(CultureInfo.InvariantCulture);
         if (string.IsNullOrEmpty(protocolName)) return Protocol.RestHttpJson; // This default has changed since the full framework implementation, where it was TCP/IP
 
-        Protocol protocol;
-        switch (protocolName)
+        var protocol = protocolName switch
         {
-            case "inprocess":
-                protocol = Protocol.InProcess;
-                break;
-            case "wshttp":
-                protocol = Protocol.WsHttp;
-                break;
-            case "basichttp":
-                protocol = Protocol.BasicHttp;
-                break;
-            case "rest":
-            case "restjson":
-            case "resthttpjson":
-                protocol = Protocol.RestHttpJson;
-                break;
-            case "restxml":
-            case "resthttpxml":
-                protocol = Protocol.RestHttpXml;
-                break;
-            default:
-                protocol = Protocol.NetTcp;
-                break;
-        }
-
+            "inprocess" => Protocol.InProcess,
+            "wshttp" => Protocol.WsHttp,
+            "basichttp" => Protocol.BasicHttp,
+            "rest" or "restjson" or "resthttpjson" => Protocol.RestHttpJson,
+            "restxml" or "resthttpxml" => Protocol.RestHttpXml,
+            _ => Protocol.NetTcp,
+        };
         if (CacheSettings)
             lock (CachedProtocols)
                 if (CachedProtocols.ContainsKey(key))
@@ -216,54 +318,6 @@ public static class ServiceClient
                     CachedProtocols.Add(key, protocol);
 
         return protocol;
-    }
-
-    /// <summary>
-    /// Gets the allowable message size for a specific interface
-    /// </summary>
-    /// <typeparam name="TServiceType">The type of the T service type.</typeparam>
-    /// <returns>MessageSize.</returns>
-    private static MessageSize GetMessageSize<TServiceType>() => GetMessageSize(typeof(TServiceType).Name);
-
-    /// <summary>
-    /// Gets the allowable message size for a specific interface
-    /// </summary>
-    /// <param name="interfaceName">Name of the interface.</param>
-    /// <returns>MessageSize.</returns>
-    private static MessageSize GetMessageSize(string interfaceName)
-    {
-        var key = "ServiceMessageSize:" + interfaceName;
-        lock (CachedMessageSizes)
-            if (CacheSettings && CachedMessageSizes.ContainsKey(key))
-                return CachedMessageSizes[key];
-
-        var messageSize = GetSetting(key).ToLower(CultureInfo.InvariantCulture);
-        var size = MessageSize.Medium;
-
-        switch (messageSize)
-        {
-            case "large":
-                size = MessageSize.Large;
-                break;
-            case "normal":
-                size = MessageSize.Normal;
-                break;
-            case "verylarge":
-                size = MessageSize.VeryLarge;
-                break;
-            case "max":
-                size = MessageSize.Max;
-                break;
-        }
-
-        if (CacheSettings)
-            lock (CachedMessageSizes)
-                if (CachedMessageSizes.ContainsKey(key))
-                    CachedMessageSizes[key] = size;
-                else
-                    CachedMessageSizes.Add(key, size);
-
-        return size;
     }
 
     /// <summary>

@@ -3,15 +3,19 @@
 /// <summary>
 /// Standard implementation for a REST Proxy handler
 /// </summary>
-public class RestProxyHandler : IProxyHandler
+/// <remarks>
+/// Initializes a new instance of the <see cref="RestProxyHandler"/> class.
+/// </remarks>
+/// <param name="serviceUri">The service root URI.</param>
+public class RestProxyHandler(Uri serviceUri) : IProxyHandler
 {
-    /// <summary>
-    /// Initializes a new instance of the <see cref="RestProxyHandler"/> class.
-    /// </summary>
-    /// <param name="serviceUri">The service root URI.</param>
-    public RestProxyHandler(Uri serviceUri) => _serviceUri = serviceUri;
+    /// <summary>API key sent on this channel's HTTP requests. Null or empty omits the header.</summary>
+    public string ApiKey { get; set; }
 
-    private readonly Uri _serviceUri;
+    /// <summary>Header containing the API key. Defaults to X-Api-Key.</summary>
+    public string ApiKeyHeaderName { get; set; } = "X-Api-Key";
+
+    private readonly Uri _serviceUri = serviceUri;
     private Type _contractType;
 
     /// <summary>
@@ -27,14 +31,13 @@ public class RestProxyHandler : IProxyHandler
 
         if (_contractType == null)
         {
-            var declaringType = method.DeclaringType;
-            if (declaringType == null) throw new Exception("Can't determine declaring type of method '" + method.Name + "'.");
+            var declaringType = method.DeclaringType ?? throw new Exception($"Can't determine declaring type of method '{method.Name}'.");
             if (declaringType.IsInterface)
                 _contractType = declaringType;
             else
             {
                 var interfaces = declaringType.GetInterfaces();
-                if (interfaces.Length != 1) throw new Exception("Can't determine declaring contract interface for method '" + method.Name + "'.");
+                if (interfaces.Length != 1) throw new Exception($"Can't determine declaring contract interface for method '{method.Name}'.");
                 _contractType = interfaces[0];
             }
         }
@@ -43,7 +46,7 @@ public class RestProxyHandler : IProxyHandler
         var exposedMethodName = RestHelper.GetExposedMethodNameFromContract(method.Name, httpMethod, _contractType);
         var serviceUri = _serviceUri.AbsoluteUri.Trim();
         if (serviceUri.EndsWith("/")) serviceUri = serviceUri.Substring(0, serviceUri.Length - 1);
-        var serviceUriAbsoluteUri = serviceUri + "/" + exposedMethodName;
+        var serviceUriAbsoluteUri = $"{serviceUri}/{exposedMethodName}";
 
         try
         {
@@ -52,71 +55,59 @@ public class RestProxyHandler : IProxyHandler
                 // File response from a REST/HTTP call is a special case, as it returns the raw file. 
                 // To make everything work transparently, we thus re-assembly a file response object here.
                 var fileResponseContent = new byte[0];
-                using (var client = new WebClient())
-                {
-                    client.Headers.Add("Content-Type", "application/json; charset=utf-8");
-                    client.Encoding = Encoding.UTF8;
-                    switch (httpMethod)
-                    {
-                        case "POST":
-                            fileResponseContent = client.UploadData(serviceUriAbsoluteUri, Encoding.UTF8.GetBytes(JsonHelper.SerializeToRestJson(data)));
-                            break;
-                        case "GET":
-                            var serializedData = RestHelper.SerializeToUrlParameters(data, "GET");
-                            var serviceFullUrl = serviceUriAbsoluteUri + serializedData;
-                            fileResponseContent = client.DownloadData(serviceFullUrl);
-                            break;
-                        default:
-                            fileResponseContent = client.UploadData(serviceUriAbsoluteUri, httpMethod, Encoding.UTF8.GetBytes(JsonHelper.SerializeToRestJson(data)));
-                            break;
-                    }
-                    var fileName = string.Empty;
-                    if (client.ResponseHeaders["Content-Disposition"] != null)
-                    {
-                        fileName = client.ResponseHeaders["Content-Disposition"];
-                        if (fileName.IndexOf("filename=\"") > -1)
-                        {
-                            fileName = fileName.Substring(fileName.IndexOf("filename=\"") + 10);
-                            if (fileName.EndsWith("\""))
-                                fileName = fileName.Substring(0, fileName.Length - 1);
-                        } 
-                    }
-
-                    var contentType = "application/x-binary";
-                    if (client.ResponseHeaders["Content-Type"] != null)
-                        contentType = client.ResponseHeaders["Content-Type"];
-
-                    return new FileResponse
-                    {
-                        FileBytes = fileResponseContent,
-                        ContentType = contentType,
-                        FileName = fileName
-                    };
-                }
-            }
-            else
-            {
-                using var client = new WebClient();
+                using var client = CreateWebClient();
                 client.Headers.Add("Content-Type", "application/json; charset=utf-8");
                 client.Encoding = Encoding.UTF8;
-                string restResponse;
-
-                var serializedData = RestHelper.SerializeToUrlParameters(data, httpMethod);
-                var serviceFullUrl = serviceUriAbsoluteUri + serializedData;
-
                 switch (httpMethod)
                 {
                     case "POST":
-                        restResponse = client.UploadString(serviceFullUrl, JsonHelper.SerializeToRestJson(data));
+                        fileResponseContent = client.UploadData(serviceUriAbsoluteUri, Encoding.UTF8.GetBytes(JsonHelper.SerializeToRestJson(data)));
                         break;
                     case "GET":
-                        restResponse = client.DownloadString(serviceFullUrl);
+                        var serializedData = RestHelper.SerializeToUrlParameters(data, "GET");
+                        var serviceFullUrl = serviceUriAbsoluteUri + serializedData;
+                        fileResponseContent = client.DownloadData(serviceFullUrl);
                         break;
                     default:
-                        restResponse = client.UploadString(serviceFullUrl, httpMethod, JsonHelper.SerializeToRestJson(data));
+                        fileResponseContent = client.UploadData(serviceUriAbsoluteUri, httpMethod, Encoding.UTF8.GetBytes(JsonHelper.SerializeToRestJson(data)));
                         break;
                 }
+                var fileName = string.Empty;
+                if (client.ResponseHeaders["Content-Disposition"] != null)
+                {
+                    fileName = client.ResponseHeaders["Content-Disposition"];
+                    if (fileName.IndexOf("filename=\"") > -1)
+                    {
+                        fileName = fileName.Substring(fileName.IndexOf("filename=\"") + 10);
+                        if (fileName.EndsWith("\""))
+                            fileName = fileName.Substring(0, fileName.Length - 1);
+                    }
+                }
 
+                var contentType = "application/x-binary";
+                if (client.ResponseHeaders["Content-Type"] != null)
+                    contentType = client.ResponseHeaders["Content-Type"];
+
+                return new FileResponse
+                {
+                    FileBytes = fileResponseContent,
+                    ContentType = contentType,
+                    FileName = fileName
+                };
+            }
+            else
+            {
+                using var client = CreateWebClient();
+                client.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                client.Encoding = Encoding.UTF8;
+                var serializedData = RestHelper.SerializeToUrlParameters(data, httpMethod);
+                var serviceFullUrl = serviceUriAbsoluteUri + serializedData;
+                var restResponse = httpMethod switch
+                {
+                    "POST" => client.UploadString(serviceFullUrl, JsonHelper.SerializeToRestJson(data)),
+                    "GET" => client.DownloadString(serviceFullUrl),
+                    _ => client.UploadString(serviceFullUrl, httpMethod, JsonHelper.SerializeToRestJson(data)),
+                };
                 return JsonHelper.DeserializeFromRestJson(restResponse, method.ReturnType);
             }
         }
@@ -126,7 +117,39 @@ public class RestProxyHandler : IProxyHandler
             throw new CommunicationException("Unable to communicate with REST service.", ex);
         }
     }
+
+    private WebClient CreateWebClient()
+    {
+        if (string.IsNullOrEmpty(ApiKey))
+            return new WebClient();
+
+        var client = new ApiKeyWebClient { HasApiKey = true };
+        client.Headers.Add(ApiKeyHeaderName, ApiKey);
+        return client;
+    }
+
+    // Custom headers are otherwise forwarded automatically when WebClient follows redirects.
+    private class ApiKeyWebClient : WebClient
+    {
+        internal bool HasApiKey { get; set; }
+
+        protected override WebRequest GetWebRequest(Uri address)
+        {
+            var request = base.GetWebRequest(address);
+            if (HasApiKey && request is HttpWebRequest httpRequest) httpRequest.AllowAutoRedirect = false;
+            return request;
+        }
+
+        protected override WebResponse GetWebResponse(WebRequest request)
+        {
+            var response = base.GetWebResponse(request);
+            if (HasApiKey && response is HttpWebResponse httpResponse && (int)httpResponse.StatusCode >= 300 && (int)httpResponse.StatusCode < 400)
+                throw new WebException("Automatic redirects are disabled for API-key requests.", null, WebExceptionStatus.ProtocolError, response);
+            return response;
+        }
+    }
 }
+
 /// <summary>Represents a communication error in either the service or client application.</summary>
 [Serializable]
 public class CommunicationException : SystemException

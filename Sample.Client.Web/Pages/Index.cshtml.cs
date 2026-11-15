@@ -5,13 +5,12 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace Sample.Client.Web.Pages
-{
-    public class IndexModel : PageModel
-    {
-        public void OnGet()
-        {
+namespace Sample.Client.Web.Pages;
 
-        }
+public class IndexModel : PageModel
+{
+    public void OnGet()
+    {
+
     }
 }

@@ -7,6 +7,7 @@
 		<Company>Markus Egger Inc.</Company>
 		<Product>CODE Framework</Product>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+		<PackageIcon></PackageIcon>
 		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 		<LangVersion>latest</LangVersion>
 	</PropertyGroup>

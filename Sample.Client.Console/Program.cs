@@ -4,6 +4,8 @@ using CODE.Framework.Services.Client;
 using Sample.Contracts;
 
 ConfigurationSettings.Sources["Memory"].Settings["RestServiceUrl:ICustomerService"] = "http://localhost:5008/api/customers";
+// Matches Sample.Web's CustomerApiKey setting. ServiceClient adds X-Api-Key to every customer request.
+ConfigurationSettings.Sources["Memory"].Settings["RestServiceApiKey:ICustomerService"] = "sample-customer-api-key";
 ConfigurationSettings.Sources["Memory"].Settings["RestServiceUrl:IUserService"] = "http://localhost:5008/api/users";
 
 var originalColor = Console.ForegroundColor;
@@ -183,4 +185,7 @@ ServiceClient.Call<ICustomerService>(s =>
 
 Console.ForegroundColor = originalColor;
 Console.WriteLine();
+Console.WriteLine("Calling GetCustomersAsync...");
+var asyncResponse = await ServiceClient.CallAsync<ICustomerService, GetCustomersResponse>(service => service.GetCustomersAsync(new GetCustomersRequest()));
+Console.WriteLine($"Async customers retrieved: {asyncResponse.CustomerList.Count}");
 Console.WriteLine("Done.");

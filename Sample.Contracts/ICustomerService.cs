@@ -1,6 +1,4 @@
-﻿using System.Threading.Tasks;
-
-namespace Sample.Contracts;
+﻿namespace Sample.Contracts;
 
 /// <summary>
 /// Service operations related to customers
@@ -31,9 +29,13 @@ public interface ICustomerService
     DeleteCustomerResponse DeleteCustomer(DeleteCustomerRequest request);
 
     /// <summary>
-    /// Retrieves a list of customers
+    /// Returns a list of all customers.
     /// </summary>
+    /// <param name="request">Request object (empty parameters)</param>
+    /// <returns>A response with a list of customers</returns>
     [OperationContract, Rest(Method = RestMethods.Get, Name = "")]
+    [Description("Returns a list of all customers.")]
+    [AiTool(Title = "Get Customers")]
     GetCustomersResponse GetCustomers(GetCustomersRequest request);
 
     /// <summary>
@@ -90,7 +92,6 @@ public class GetStatusResponse : BaseServiceResponse
     [DataMember]
     public CustomerStatus Status { get; set; } = CustomerStatus.Normal;
 }
-
 
 [DataContract]
 public class GetStatusRequest

@@ -1,23 +1,22 @@
-﻿namespace CODE.Framework.Fundamentals.Utilities.Csv
+﻿namespace CODE.Framework.Fundamentals.Utilities.Csv;
+
+/// <summary>
+/// Specifies the action to take when a field is missing.
+/// </summary>
+public enum MissingFieldAction
 {
     /// <summary>
-    /// Specifies the action to take when a field is missing.
+    /// Treat as a parsing error.
     /// </summary>
-    public enum MissingFieldAction
-    {
-        /// <summary>
-        /// Treat as a parsing error.
-        /// </summary>
-        ParseError = 0,
+    ParseError = 0,
 
-        /// <summary>
-        /// Replaces by an empty value.
-        /// </summary>
-        ReplaceByEmpty = 1,
+    /// <summary>
+    /// Replaces by an empty value.
+    /// </summary>
+    ReplaceByEmpty = 1,
 
-        /// <summary>
-        /// Replaces by a null value (<see langword="null"/>).
-        /// </summary>
-        ReplaceByNull = 2,
-    }
+    /// <summary>
+    /// Replaces by a null value (<see langword="null"/>).
+    /// </summary>
+    ReplaceByNull = 2,
 }
