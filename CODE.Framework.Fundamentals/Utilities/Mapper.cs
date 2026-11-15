@@ -62,181 +62,230 @@ public class Mapper
     /// <returns>True if map operation is a success</returns>
     public static bool Map(object source, object destination, MappingOptions options = null) => new Mapper().MapObjects(source, destination, options);
 
-    /// <summary>
-    /// Attempts to fill all the read/write properties in the destination object
-    /// from the properties int he source object
-    /// </summary>
-    /// <param name="source">The source.</param>
-    /// <param name="destination">The destination.</param>
-    /// <param name="options">The options.</param>
-    /// <returns>True if successful</returns>
-    public bool MapObjects(object source, object destination, MappingOptions options = null)
-    {
-        if (options == null) options = new MappingOptions();
+	/// <summary>
+	/// Attempts to fill all the read/write properties in the destination object
+	/// from the properties int he source object
+	/// </summary>
+	/// <param name="source">The source.</param>
+	/// <param name="destination">The destination.</param>
+	/// <param name="options">The options.</param>
+	/// <returns>True if successful</returns>
+	public bool MapObjects(object source, object destination, MappingOptions options = null)
+	{
+		if (options == null) options = new MappingOptions();
 
-        var oldMaps = Maps;
-        if (options.Maps != null)
-            Maps = options.Maps;
+		var oldMaps = Maps;
+		if (options.Maps != null)
+			Maps = options.Maps;
 
-        var retVal = true;
-        try
-        {
-            var sourceType = source.GetType();
-            var destinationProperties = destination.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
-            foreach (var destinationProperty in destinationProperties)
-                if (destinationProperty.CanRead && destinationProperty.CanWrite)
-                {
-                    var sourcePropertyName = GetMappedSourcePropertyName(destinationProperty.Name, options.MapDirection);
+		var retVal = true;
+		try
+		{
+			var sourceType = source.GetType();
+			var destinationProperties = destination.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance);
+			foreach (var destinationProperty in destinationProperties)
+				if (destinationProperty.CanRead && destinationProperty.CanWrite)
+				{
+					var sourcePropertyName = GetMappedSourcePropertyName(destinationProperty.Name, options.MapDirection);
 
-                    if (options.ExcludedFields.Contains(destinationProperty.Name))
-                    {
-                        if (options.LogMappedMembers)
-                            if (!options.IgnoredDestinationProperties.Contains(destinationProperty.Name))
-                                options.IgnoredDestinationProperties.Add(destinationProperty.Name);
-                        continue;
-                    }
+					if (options.ExcludedFields.Contains(destinationProperty.Name))
+					{
+						if (options.LogMappedMembers)
+							if (!options.IgnoredDestinationProperties.Contains(destinationProperty.Name))
+								options.IgnoredDestinationProperties.Add(destinationProperty.Name);
+						continue;
+					}
 
-                    // looks like we have one we are interested in
-                    if (options.ExcludedFields.Contains(sourcePropertyName))
-                    {
-                        if (options.LogMappedMembers)
-                            if (!options.IgnoredSourceProperties.Contains(sourcePropertyName))
-                                options.IgnoredSourceProperties.Add(sourcePropertyName);
-                        continue;
-                    }
+					// looks like we have one we are interested in
+					if (options.ExcludedFields.Contains(sourcePropertyName))
+					{
+						if (options.LogMappedMembers)
+							if (!options.IgnoredSourceProperties.Contains(sourcePropertyName))
+								options.IgnoredSourceProperties.Add(sourcePropertyName);
+						continue;
+					}
 
-                    var sourceProperty = sourceType.GetProperty(sourcePropertyName, BindingFlags.Public | BindingFlags.Instance);
-                    if (sourceProperty == null)
-                    {
-                        if (!options.IgnoredDestinationProperties.Contains(destinationProperty.Name))
-                            options.IgnoredDestinationProperties.Add(destinationProperty.Name); // Have to ignore it, since we can't find the source to map from
-                        continue;
-                    }
+					var sourceProperty = sourceType.GetProperty(sourcePropertyName, BindingFlags.Public | BindingFlags.Instance);
+					if (sourceProperty == null)
+					{
+						if (!options.IgnoredDestinationProperties.Contains(destinationProperty.Name))
+							options.IgnoredDestinationProperties.Add(destinationProperty.Name); // Have to ignore it, since we can't find the source to map from
+						continue;
+					}
 
-                    if (sourceProperty.CanRead && destinationProperty.CanWrite)
-                        if (options.MapFunctionsFiltered.ContainsKey(sourceProperty.Name) && options.MapFunctionsFiltered[destinationProperty.Name](source, destination, options.MapDirection))
-                        {
-                            // Successfully mapped with a function filtered to this property
-                            if (options.LogMappedMembers)
-                            {
-                                if (!options.MappedSourceProperties.Contains(sourcePropertyName)) options.MappedSourceProperties.Add(sourcePropertyName);
-                                if (!options.MappedDestinationProperties.Contains(destinationProperty.Name)) options.MappedDestinationProperties.Add(destinationProperty.Name);
-                            }
-                        }
-                        else if (sourceProperty.PropertyType == destinationProperty.PropertyType)
-                            try
-                            {
-                                var currentValue = destinationProperty.GetValue(destination, null);
-                                var newValue = sourceProperty.GetValue(source, null);
-                                UpdateValueIfNeeded(destination, destinationProperty, currentValue, newValue);
-                                if (options.LogMappedMembers)
-                                {
-                                    if (!options.MappedSourceProperties.Contains(sourcePropertyName)) options.MappedSourceProperties.Add(sourcePropertyName);
-                                    if (!options.MappedDestinationProperties.Contains(destinationProperty.Name)) options.MappedDestinationProperties.Add(destinationProperty.Name);
-                                }
-                            }
-                            catch { } // Nothing we can do, really
-                        else if (sourceProperty.PropertyType.Name == "Nullable`1" && !destinationProperty.PropertyType.Name.StartsWith("Nullable"))
-                            try
-                            {
-                                // The source is nullable, while the destination is not. This could be problematic, but we give it a try
-                                var newValue = sourceProperty.GetValue(source, null);
-                                if (newValue != null) // Can't set it if it is null.
-                                    destinationProperty.SetValue(destination, newValue, null);
-                                if (options.LogMappedMembers)
-                                {
-                                    if (!options.MappedSourceProperties.Contains(sourcePropertyName)) options.MappedSourceProperties.Add(sourcePropertyName);
-                                    if (!options.MappedDestinationProperties.Contains(destinationProperty.Name)) options.MappedDestinationProperties.Add(destinationProperty.Name);
-                                }
-                            }
-                            catch { } // Nothing we can do, really
-                        else if (destinationProperty.PropertyType.Name == "Nullable`1" && !sourceProperty.PropertyType.Name.StartsWith("Nullable"))
-                            try
-                            {
-                                // The destination is nullable although the source isn't. This has a pretty good chance of working
-                                var newValue = sourceProperty.GetValue(source, null);
-                                destinationProperty.SetValue(destination, newValue, null);
-                                if (options.LogMappedMembers)
-                                {
-                                    if (!options.MappedSourceProperties.Contains(sourcePropertyName)) options.MappedSourceProperties.Add(sourcePropertyName);
-                                    if (!options.MappedDestinationProperties.Contains(destinationProperty.Name)) options.MappedDestinationProperties.Add(destinationProperty.Name);
-                                }
-                            }
-                            catch { } // Nothing we can do, really
-                        else
-                        {
-                            // Property types differ, but maybe we can still map them
-                            if (options.MapEnums)
-                                if (sourceProperty.PropertyType.IsEnum && destinationProperty.PropertyType.IsEnum)
-                                {
-                                    MapEnumValues(source, destination, destinationProperty, sourceProperty, options);
-                                    if (options.LogMappedMembers)
-                                    {
-                                        if (!options.MappedSourceProperties.Contains(sourcePropertyName)) options.MappedSourceProperties.Add(sourcePropertyName);
-                                        if (!options.MappedDestinationProperties.Contains(destinationProperty.Name)) options.MappedDestinationProperties.Add(destinationProperty.Name);
-                                    }
-                                }
-                                else if (PropertyTypeIsNumeric(sourceProperty.PropertyType) && destinationProperty.PropertyType.IsEnum)
-                                {
-                                    MapNumericToEnum(source, destination, destinationProperty, sourceProperty);
-                                    if (options.LogMappedMembers)
-                                    {
-                                        if (!options.MappedSourceProperties.Contains(sourcePropertyName)) options.MappedSourceProperties.Add(sourcePropertyName);
-                                        if (!options.MappedDestinationProperties.Contains(destinationProperty.Name)) options.MappedDestinationProperties.Add(destinationProperty.Name);
-                                    }
-                                }
-                                else if (sourceProperty.PropertyType.IsEnum && PropertyTypeIsNumeric(destinationProperty.PropertyType))
-                                {
-                                    MapEnumToNumeric(source, destination, destinationProperty, sourceProperty);
-                                    if (options.LogMappedMembers)
-                                    {
-                                        if (!options.MappedSourceProperties.Contains(sourcePropertyName)) options.MappedSourceProperties.Add(sourcePropertyName);
-                                        if (!options.MappedDestinationProperties.Contains(destinationProperty.Name)) options.MappedDestinationProperties.Add(destinationProperty.Name);
-                                    }
-                                }
-                        }
-                }
-                else if (options.LogMappedMembers)
-                {
-                    var sourcePropertyName = GetMappedSourcePropertyName(destinationProperty.Name, options.MapDirection);
-                    if (!options.IgnoredSourceProperties.Contains(sourcePropertyName)) options.IgnoredSourceProperties.Add(sourcePropertyName);
-                    if (!options.IgnoredDestinationProperties.Contains(destinationProperty.Name)) options.IgnoredDestinationProperties.Add(destinationProperty.Name);
-                }
-        }
-        catch
-        {
-            retVal = false;
-        }
+					if (sourceProperty.CanRead && destinationProperty.CanWrite)
+						if (options.MapFunctionsFiltered.ContainsKey(sourceProperty.Name) && options.MapFunctionsFiltered[destinationProperty.Name](source, destination, options.MapDirection))
+						{
+							// Successfully mapped with a function filtered to this property
+							if (options.LogMappedMembers)
+							{
+								if (!options.MappedSourceProperties.Contains(sourcePropertyName)) options.MappedSourceProperties.Add(sourcePropertyName);
+								if (!options.MappedDestinationProperties.Contains(destinationProperty.Name)) options.MappedDestinationProperties.Add(destinationProperty.Name);
+							}
+						}
+						else if (sourceProperty.PropertyType == destinationProperty.PropertyType)
+							try
+							{
+								var currentValue = destinationProperty.GetValue(destination, null);
+								var newValue = sourceProperty.GetValue(source, null);
+								UpdateValueIfNeeded(destination, destinationProperty, currentValue, newValue);
+								if (options.LogMappedMembers)
+								{
+									if (!options.MappedSourceProperties.Contains(sourcePropertyName)) options.MappedSourceProperties.Add(sourcePropertyName);
+									if (!options.MappedDestinationProperties.Contains(destinationProperty.Name)) options.MappedDestinationProperties.Add(destinationProperty.Name);
+								}
+							}
+							catch { } // Nothing we can do, really
+						else if (options.MapDateOnly && TryMapDateOnly(source, destination, sourceProperty, destinationProperty))
+						{
+							// Mapped DateTime to DateOnly or vice versa (opt-in)
+							if (options.LogMappedMembers)
+							{
+								if (!options.MappedSourceProperties.Contains(sourcePropertyName)) options.MappedSourceProperties.Add(sourcePropertyName);
+								if (!options.MappedDestinationProperties.Contains(destinationProperty.Name)) options.MappedDestinationProperties.Add(destinationProperty.Name);
+							}
+						}
+						else if (sourceProperty.PropertyType.Name == "Nullable`1" && !destinationProperty.PropertyType.Name.StartsWith("Nullable"))
+							try
+							{
+								// The source is nullable, while the destination is not. This could be problematic, but we give it a try
+								var newValue = sourceProperty.GetValue(source, null);
+								if (newValue != null) // Can't set it if it is null.
+									destinationProperty.SetValue(destination, newValue, null);
+								if (options.LogMappedMembers)
+								{
+									if (!options.MappedSourceProperties.Contains(sourcePropertyName)) options.MappedSourceProperties.Add(sourcePropertyName);
+									if (!options.MappedDestinationProperties.Contains(destinationProperty.Name)) options.MappedDestinationProperties.Add(destinationProperty.Name);
+								}
+							}
+							catch { } // Nothing we can do, really
+						else if (destinationProperty.PropertyType.Name == "Nullable`1" && !sourceProperty.PropertyType.Name.StartsWith("Nullable"))
+							try
+							{
+								// The destination is nullable although the source isn't. This has a pretty good chance of working
+								var newValue = sourceProperty.GetValue(source, null);
+								destinationProperty.SetValue(destination, newValue, null);
+								if (options.LogMappedMembers)
+								{
+									if (!options.MappedSourceProperties.Contains(sourcePropertyName)) options.MappedSourceProperties.Add(sourcePropertyName);
+									if (!options.MappedDestinationProperties.Contains(destinationProperty.Name)) options.MappedDestinationProperties.Add(destinationProperty.Name);
+								}
+							}
+							catch { } // Nothing we can do, really
+						else
+						{
+							// Property types differ, but maybe we can still map them
+							if (options.MapEnums)
+								if (sourceProperty.PropertyType.IsEnum && destinationProperty.PropertyType.IsEnum)
+								{
+									MapEnumValues(source, destination, destinationProperty, sourceProperty, options);
+									if (options.LogMappedMembers)
+									{
+										if (!options.MappedSourceProperties.Contains(sourcePropertyName)) options.MappedSourceProperties.Add(sourcePropertyName);
+										if (!options.MappedDestinationProperties.Contains(destinationProperty.Name)) options.MappedDestinationProperties.Add(destinationProperty.Name);
+									}
+								}
+								else if (PropertyTypeIsNumeric(sourceProperty.PropertyType) && destinationProperty.PropertyType.IsEnum)
+								{
+									MapNumericToEnum(source, destination, destinationProperty, sourceProperty);
+									if (options.LogMappedMembers)
+									{
+										if (!options.MappedSourceProperties.Contains(sourcePropertyName)) options.MappedSourceProperties.Add(sourcePropertyName);
+										if (!options.MappedDestinationProperties.Contains(destinationProperty.Name)) options.MappedDestinationProperties.Add(destinationProperty.Name);
+									}
+								}
+								else if (sourceProperty.PropertyType.IsEnum && PropertyTypeIsNumeric(destinationProperty.PropertyType))
+								{
+									MapEnumToNumeric(source, destination, destinationProperty, sourceProperty);
+									if (options.LogMappedMembers)
+									{
+										if (!options.MappedSourceProperties.Contains(sourcePropertyName)) options.MappedSourceProperties.Add(sourcePropertyName);
+										if (!options.MappedDestinationProperties.Contains(destinationProperty.Name)) options.MappedDestinationProperties.Add(destinationProperty.Name);
+									}
+								}
+						}
+				}
+				else if (options.LogMappedMembers)
+				{
+					var sourcePropertyName = GetMappedSourcePropertyName(destinationProperty.Name, options.MapDirection);
+					if (!options.IgnoredSourceProperties.Contains(sourcePropertyName)) options.IgnoredSourceProperties.Add(sourcePropertyName);
+					if (!options.IgnoredDestinationProperties.Contains(destinationProperty.Name)) options.IgnoredDestinationProperties.Add(destinationProperty.Name);
+				}
+		}
+		catch
+		{
+			retVal = false;
+		}
 
-        // We also respect potential delegates
-        if (retVal)
-            foreach (var function in options.MapFunctions)
-                if (!function(source, destination, options.MapDirection))
-                {
-                    retVal = false;
-                    break;
-                }
+		// We also respect potential delegates
+		if (retVal)
+			foreach (var function in options.MapFunctions)
+				if (!function(source, destination, options.MapDirection))
+				{
+					retVal = false;
+					break;
+				}
 
-        Maps = oldMaps;
+		Maps = oldMaps;
 
-        if (options.LogMappedMembers)
-        {
-            // We want to present all these logged list in a sorted fashion
-            options.MappedSourceProperties = options.MappedSourceProperties.OrderBy(p => p).ToList();
-            options.IgnoredSourceProperties = options.IgnoredSourceProperties.OrderBy(p => p).ToList();
-            options.MappedDestinationProperties = options.MappedDestinationProperties.OrderBy(p => p).ToList();
-            options.IgnoredDestinationProperties = options.IgnoredDestinationProperties.OrderBy(p => p).ToList();
-        }
+		if (options.LogMappedMembers)
+		{
+			// We want to present all these logged list in a sorted fashion
+			options.MappedSourceProperties = options.MappedSourceProperties.OrderBy(p => p).ToList();
+			options.IgnoredSourceProperties = options.IgnoredSourceProperties.OrderBy(p => p).ToList();
+			options.MappedDestinationProperties = options.MappedDestinationProperties.OrderBy(p => p).ToList();
+			options.IgnoredDestinationProperties = options.IgnoredDestinationProperties.OrderBy(p => p).ToList();
+		}
 
-        return retVal;
-    }
+		return retVal;
+	}
 
-    /// <summary>
-    /// Returns true if the property's type is some numeric type
-    /// </summary>
-    /// <param name="type">The type.</param>
-    /// <returns></returns>
-    protected virtual bool PropertyTypeIsNumeric(Type type) =>
+	/// <summary>
+	/// Maps a DateTime property to a DateOnly property or vice versa, including nullable forms.
+	/// </summary>
+	/// <param name="source">The source object.</param>
+	/// <param name="destination">The destination object.</param>
+	/// <param name="sourceProperty">The source property.</param>
+	/// <param name="destinationProperty">The destination property.</param>
+	/// <returns>True if the pair was mapped (a skipped null counts as mapped), otherwise false.</returns>
+	protected virtual bool TryMapDateOnly(object source, object destination, PropertyInfo sourceProperty, PropertyInfo destinationProperty)
+	{
+		var sourceType = sourceProperty.PropertyType;
+		var destinationType = destinationProperty.PropertyType;
+		var isDateTimeToDateOnly = DateOnlyConverter.IsDateTime(sourceType) && DateOnlyConverter.IsDateOnly(destinationType);
+		var isDateOnlyToDateTime = DateOnlyConverter.IsDateOnly(sourceType) && DateOnlyConverter.IsDateTime(destinationType);
+		if (!isDateTimeToDateOnly && !isDateOnlyToDateTime) return false;
+
+		try
+		{
+			var currentValue = destinationProperty.GetValue(destination, null);
+			var sourceValue = sourceProperty.GetValue(source, null);
+			if (sourceValue == null)
+			{
+				// Nullable destination gets null; non-nullable destination is left unchanged (same as the nullable branches)
+				if (Nullable.GetUnderlyingType(destinationType) != null)
+					UpdateValueIfNeeded(destination, destinationProperty, currentValue, null);
+				return true;
+			}
+
+			var newValue = isDateTimeToDateOnly
+				? DateOnlyConverter.ToDateOnly((DateTime)sourceValue, DateOnlyConverter.GetNonNullableType(destinationType))
+				: DateOnlyConverter.ToDateTime(sourceValue);
+			UpdateValueIfNeeded(destination, destinationProperty, currentValue, newValue);
+			return true;
+		}
+		catch
+		{
+			return false; // Falls through to the existing branches, which skip the property as before
+		}
+	}
+
+	/// <summary>
+	/// Returns true if the property's type is some numeric type
+	/// </summary>
+	/// <param name="type">The type.</param>
+	/// <returns></returns>
+	protected virtual bool PropertyTypeIsNumeric(Type type) =>
         type == typeof(byte)
      || type == typeof(sbyte)
      || type == typeof(short)
@@ -1550,12 +1599,28 @@ public class MappingOptions
     /// <value><c>true</c> if case sensitive, otherwise, <c>false</c>.</value>
     public bool MatchEnumCase { get; set; } = true;
 
-    /// <summary>
-    /// If set to true, the mapper will automatically try to make prefixed fields to 
-    /// non-prefixed properties, such as cName or _name or c_name to Name.
-    /// </summary>
-    /// <value><c>true</c> if [smart prefix map]; otherwise, <c>false</c>.</value>
-    public bool SmartPrefixMap { get; set; } = false;
+	/// <summary>
+	/// Defines whether DateTime and DateOnly properties (including nullable forms) are mapped to each other.
+	/// </summary>
+	/// <remarks>
+	/// DateTime to DateOnly drops the time. DateOnly to DateTime uses midnight. A null source leaves a non-nullable destination unchanged.
+	/// Defaults to MapDateOnlyByDefault.
+	/// </remarks>
+	/// <value><c>true</c> if DateTime and DateOnly are to be mapped, otherwise, <c>false</c>.</value>
+	public bool MapDateOnly { get; set; } = MapDateOnlyByDefault;
+
+	/// <summary>
+	/// App-wide default for MapDateOnly on new MappingOptions instances. Set once at application startup.
+	/// </summary>
+	/// <value><c>true</c> to opt in by default, otherwise, <c>false</c> (default).</value>
+	public static bool MapDateOnlyByDefault { get; set; } = false;
+
+	/// <summary>
+	/// If set to true, the mapper will automatically try to make prefixed fields to 
+	/// non-prefixed properties, such as cName or _name or c_name to Name.
+	/// </summary>
+	/// <value><c>true</c> if [smart prefix map]; otherwise, <c>false</c>.</value>
+	public bool SmartPrefixMap { get; set; } = false;
 
     /// <summary>
     /// If not null, this list of maps will be used instead of other defined maps
