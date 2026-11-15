@@ -142,7 +142,16 @@ namespace CODE.Framework.Fundamentals.Utilities
                                     }
                                 }
                                 catch { } // Nothing we can do, really
-                            else if (sourceProperty.PropertyType.Name == "Nullable`1" && !destinationProperty.PropertyType.Name.StartsWith("Nullable"))
+							else if (options.MapDateOnly && TryMapDateOnly(source, destination, sourceProperty, destinationProperty))
+							{
+								// Mapped DateTime to DateOnly or vice versa (opt-in)
+								if (options.LogMappedMembers)
+								{
+									if (!options.MappedSourceProperties.Contains(sourcePropertyName)) options.MappedSourceProperties.Add(sourcePropertyName);
+									if (!options.MappedDestinationProperties.Contains(destinationProperty.Name)) options.MappedDestinationProperties.Add(destinationProperty.Name);
+								}
+							}
+							else if (sourceProperty.PropertyType.Name == "Nullable`1" && !destinationProperty.PropertyType.Name.StartsWith("Nullable"))
                                 try
                                 {
                                     // The source is nullable, while the destination is not. This could be problematic, but we give it a try
@@ -237,12 +246,52 @@ namespace CODE.Framework.Fundamentals.Utilities
             return retVal;
         }
 
-        /// <summary>
-        /// Returns true if the property's type is some numeric type
-        /// </summary>
-        /// <param name="type">The type.</param>
-        /// <returns></returns>
-        protected virtual bool PropertyTypeIsNumeric(Type type) =>
+		/// <summary>
+		/// Maps a DateTime property to a DateOnly property or vice versa, including nullable forms.
+		/// </summary>
+		/// <param name="source">The source object.</param>
+		/// <param name="destination">The destination object.</param>
+		/// <param name="sourceProperty">The source property.</param>
+		/// <param name="destinationProperty">The destination property.</param>
+		/// <returns>True if the pair was mapped (a skipped null counts as mapped), otherwise false.</returns>
+		protected virtual bool TryMapDateOnly(object source, object destination, PropertyInfo sourceProperty, PropertyInfo destinationProperty)
+		{
+			var sourceType = sourceProperty.PropertyType;
+			var destinationType = destinationProperty.PropertyType;
+			var isDateTimeToDateOnly = DateOnlyConverter.IsDateTime(sourceType) && DateOnlyConverter.IsDateOnly(destinationType);
+			var isDateOnlyToDateTime = DateOnlyConverter.IsDateOnly(sourceType) && DateOnlyConverter.IsDateTime(destinationType);
+			if (!isDateTimeToDateOnly && !isDateOnlyToDateTime) return false;
+
+			try
+			{
+				var currentValue = destinationProperty.GetValue(destination, null);
+				var sourceValue = sourceProperty.GetValue(source, null);
+				if (sourceValue == null)
+				{
+					// Nullable destination gets null; non-nullable destination is left unchanged (same as the nullable branches)
+					if (Nullable.GetUnderlyingType(destinationType) != null)
+						UpdateValueIfNeeded(destination, destinationProperty, currentValue, null);
+					return true;
+				}
+
+				var newValue = isDateTimeToDateOnly
+					? DateOnlyConverter.ToDateOnly((DateTime)sourceValue, DateOnlyConverter.GetNonNullableType(destinationType))
+					: DateOnlyConverter.ToDateTime(sourceValue);
+				UpdateValueIfNeeded(destination, destinationProperty, currentValue, newValue);
+				return true;
+			}
+			catch
+			{
+				return false; // Falls through to the existing branches, which skip the property as before
+			}
+		}
+
+		/// <summary>
+		/// Returns true if the property's type is some numeric type
+		/// </summary>
+		/// <param name="type">The type.</param>
+		/// <returns></returns>
+		protected virtual bool PropertyTypeIsNumeric(Type type) =>
             type == typeof(byte)
          || type == typeof(sbyte)
          || type == typeof(short)
@@ -1583,12 +1632,28 @@ namespace CODE.Framework.Fundamentals.Utilities
         /// <value><c>true</c> if case sensitive, otherwise, <c>false</c>.</value>
         public bool MatchEnumCase { get; set; } = true;
 
-        /// <summary>
-        /// If set to true, the mapper will automatically try to make prefixed fields to 
-        /// non-prefixed properties, such as cName or _name or c_name to Name.
-        /// </summary>
-        /// <value><c>true</c> if [smart prefix map]; otherwise, <c>false</c>.</value>
-        public bool SmartPrefixMap { get; set; } = false;
+		/// <summary>
+		/// Defines whether DateTime and DateOnly properties (including nullable forms) are mapped to each other.
+		/// </summary>
+		/// <remarks>
+		/// DateTime to DateOnly drops the time. DateOnly to DateTime uses midnight. A null source leaves a non-nullable destination unchanged.
+		/// Defaults to MapDateOnlyByDefault.
+		/// </remarks>
+		/// <value><c>true</c> if DateTime and DateOnly are to be mapped, otherwise, <c>false</c>.</value>
+		public bool MapDateOnly { get; set; } = MapDateOnlyByDefault;
+
+		/// <summary>
+		/// App-wide default for MapDateOnly on new MappingOptions instances. Set once at application startup.
+		/// </summary>
+		/// <value><c>true</c> to opt in by default, otherwise, <c>false</c> (default).</value>
+		public static bool MapDateOnlyByDefault { get; set; } = false;
+
+		/// <summary>
+		/// If set to true, the mapper will automatically try to make prefixed fields to 
+		/// non-prefixed properties, such as cName or _name or c_name to Name.
+		/// </summary>
+		/// <value><c>true</c> if [smart prefix map]; otherwise, <c>false</c>.</value>
+		public bool SmartPrefixMap { get; set; } = false;
 
         /// <summary>
         /// If not null, this list of maps will be used instead of other defined maps
